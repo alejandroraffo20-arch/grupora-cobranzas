@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grupo RA — Sistema de Cobranzas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --navy: #1e3a6e;
+  --navy-dark: #152b54;
+  --navy-light: #e8eef7;
+  --gold: #c9a84c;
+  --gold-light: #fdf3dc;
+  --text: #1a1a2e;
+  --text-muted: #6b7280;
+  --text-light: #9ca3af;
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --success-bg: #ecfdf5; --success: #065f46; --success-border: #6ee7b7;
+  --warn-bg: #fffbeb; --warn: #92400e; --warn-border: #fcd34d;
+  --danger-bg: #fef2f2; --danger: #991b1b; --danger-border: #fca5a5;
+  --info-bg: #eff6ff; --info: #1e40af; --info-border: #bfdbfe;
+  --radius: 8px; --radius-lg: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--text);background:var(--bg);line-height:1.5}
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy) 0%,#2d5299 100%);display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-box{background:var(--surface);border-radius:var(--radius-lg);padding:40px;width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.login-logo{width:80px;height:80px;background:var(--navy);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;font-weight:700;color:var(--gold);letter-spacing:1px}
+.login-box h1{font-size:20px;font-weight:600;color:var(--navy);margin-bottom:4px}
+.login-box p{font-size:13px;color:var(--text-muted);margin-bottom:28px}
+.login-box input{width:100%;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:14px;margin-bottom:12px;background:#fff;color:var(--text)}
+.login-box input:focus{outline:none;border-color:var(--navy)}
+.btn-login{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px}
+.btn-login:hover{background:var(--navy-dark)}
+#login-error{color:#dc2626;font-size:12px;margin-top:4px}
+/* LAYOUT */
+#app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:230px;min-width:230px;background:var(--navy);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-brand{padding:20px 16px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.brand-logo{display:flex;align-items:center;gap:10px}
+.brand-icon{width:38px;height:38px;background:var(--gold);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--navy);letter-spacing:0.5px;flex-shrink:0}
+.brand-text{color:#fff;line-height:1.3}
+.brand-text strong{font-size:13px;display:block}
+.brand-text span{font-size:11px;opacity:0.6}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.nav-section-label{font-size:10px;font-weight:600;color:rgba(255,255,255,0.4);padding:12px 8px 4px;letter-spacing:0.8px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius);cursor:pointer;color:rgba(255,255,255,0.65);font-size:13px;margin-bottom:1px;transition:all 0.15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,0.1);color:#fff}
+.nav-item.active{background:rgba(255,255,255,0.15);color:#fff;font-weight:500}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8}
+.sidebar-footer{padding:12px 8px;border-top:1px solid rgba(255,255,255,0.1)}
+.user-card{display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.08);border-radius:var(--radius)}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--navy);flex-shrink:0}
+.user-info{flex:1;min-width:0}
+.user-info strong{display:block;font-size:12px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-info span{font-size:10px;color:rgba(255,255,255,0.5)}
+.btn-logout{background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;padding:4px;border-radius:4px}
+.btn-logout:hover{color:#fff}
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar h2{font-size:16px;font-weight:600;color:var(--text)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.content{flex:1;overflow-y:auto;padding:24px}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500;color:var(--text);font-family:inherit;transition:all 0.15s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn-primary:hover{background:var(--navy-dark)}
+.btn-gold{background:var(--gold);color:#fff;border-color:var(--gold)}
+.btn-gold:hover{background:#b8963e}
+.btn-danger{background:#dc2626;color:#fff;border-color:#dc2626}
+.btn-danger:hover{background:#b91c1c}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{padding:7px;border-radius:var(--radius)}
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-title{font-size:14px;font-weight:600;color:var(--text)}
+.card-body{padding:18px}
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow)}
+.stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-weight:500}
+.stat-value{font-size:22px;font-weight:700;color:var(--text);margin-bottom:2px}
+.stat-sub{font-size:11px;color:var(--text-light)}
+.stat-card.s-danger .stat-value{color:var(--danger)}
+.stat-card.s-success .stat-value{color:var(--success)}
+.stat-card.s-gold .stat-value{color:#92400e}
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.4px;background:var(--bg)}
+td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#f9fafb}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-success{background:var(--success-bg);color:var(--success);border:1px solid var(--success-border)}
+.badge-warning{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border)}
+.badge-danger{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border)}
+.badge-info{background:var(--info-bg);color:var(--info);border:1px solid var(--info-border)}
+.badge-gray{background:#f3f4f6;color:#374151;border:1px solid var(--border)}
+/* FORMS */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px}
+.form-input{padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:13px;font-family:inherit;background:#fff;color:var(--text);width:100%;transition:border-color 0.15s}
+.form-input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(30,58,110,0.08)}
+.form-input:disabled{background:#f9fafb;color:var(--text-muted)}
+.form-select{padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:13px;font-family:inherit;background:#fff;color:var(--text);width:100%}
+.form-select:focus{outline:none;border-color:var(--navy)}
+/* SECTION DIVIDER */
+.section-divider{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.6px;margin:20px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--gold)}
+/* ALERTS */
+.alert{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:var(--radius);margin-bottom:16px;font-size:13px}
+.alert-danger{background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger)}
+.alert-warning{background:var(--warn-bg);border:1px solid var(--warn-border);color:var(--warn)}
+.alert-info{background:var(--info-bg);border:1px solid var(--info-border);color:var(--info)}
+.alert-success{background:var(--success-bg);border:1px solid var(--success-border);color:var(--success)}
+/* PLAN OPTIONS */
+.plan-option{border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;cursor:pointer;transition:all 0.15s;margin-bottom:8px}
+.plan-option:hover{border-color:var(--navy);background:var(--navy-light)}
+.plan-option.selected{border-color:var(--navy);background:var(--navy-light);border-width:2px}
+.plan-header{display:flex;justify-content:space-between;align-items:center}
+.plan-name{font-weight:600;font-size:13px;color:var(--navy)}
+.plan-cuota{font-size:14px;font-weight:700;color:var(--text)}
+.plan-detail{font-size:11px;color:var(--text-muted);margin-top:3px}
+/* PROGRESS */
+.progress-wrap{background:#e5e7eb;border-radius:20px;height:8px;overflow:hidden;margin-top:6px}
+.progress-bar{height:100%;background:var(--navy);border-radius:20px;transition:width 0.5s ease}
+/* CUOTA TABLE */
+.cuota-grid{display:grid;grid-template-columns:60px 100px 110px 110px 100px 1fr;gap:0;font-size:12px}
+.cuota-header{background:#f8fafc;border-bottom:1px solid var(--border);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;font-size:10px}
+.cuota-header > div, .cuota-row-item > div{padding:9px 12px}
+.cuota-row-item{border-bottom:1px solid var(--border);transition:background 0.1s}
+.cuota-row-item:last-child{border-bottom:none}
+.cuota-row-item:hover{background:#f9fafb}
+.cuota-row-item.mora{background:var(--danger-bg)}
+.cuota-row-item.mora:hover{background:#fee2e2}
+.cuota-row-item.pagada{background:var(--success-bg)}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.modal-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:600}
+.modal-close{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;padding:4px;border-radius:var(--radius)}
+.modal-close:hover{background:var(--bg)}
+.modal-body{padding:20px}
+.modal-footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+/* MINI STATS */
+.mini-stat{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.mini-stat:last-child{border-bottom:none}
+.mini-label{color:var(--text-muted)}
+.mini-val{font-weight:600}
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast-item{padding:12px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:slideIn 0.3s ease;pointer-events:all}
+.toast-success{background:#065f46}
+.toast-error{background:#991b1b}
+.toast-info{background:var(--navy)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px}
+.tab{padding:10px 16px;cursor:pointer;font-size:13px;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500;transition:all 0.15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--navy);border-bottom-color:var(--navy)}
+/* CHECKBOX */
+.check-row{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:4px 0}
+.check-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--navy);cursor:pointer}
+/* HEADER CARD EXP */
+.exp-header{background:linear-gradient(135deg,var(--navy) 0%,#2d5299 100%);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:16px;color:#fff;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px}
+.exp-header-item{}
+.exp-header-item .label{font-size:10px;opacity:0.6;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;font-weight:600}
+.exp-header-item .value{font-size:14px;font-weight:600}
+.exp-header-item .value.big{font-size:22px;color:var(--gold)}
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,0.8);z-index:900;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* SETUP SCREEN */
+#setup-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy) 0%,#2d5299 100%);display:flex;align-items:center;justify-content:center;z-index:999}
+.setup-box{background:var(--surface);border-radius:var(--radius-lg);padding:36px;width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.setup-box h2{font-size:18px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.setup-box p{font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6}
+.setup-step{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;font-size:12px;color:var(--text-muted);line-height:1.7}
+.setup-step strong{color:var(--text);display:block;font-size:13px;margin-bottom:4px}
+.setup-box input{width:100%;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:13px;margin-bottom:10px;font-family:inherit;color:var(--text)}
+.setup-box input:focus{outline:none;border-color:var(--navy)}
+#setup-error{color:#dc2626;font-size:12px;margin-bottom:10px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-muted)}
+.empty-state svg{width:48px;height:48px;margin:0 auto 12px;opacity:0.3;display:block}
+.empty-state p{font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" style="display:none">
+  <div class="setup-box">
+    <h2>⚙️ Configuración inicial</h2>
+    <p>Para poner en marcha el sistema, necesitás configurar tu base de datos Supabase. Esto se hace una sola vez.</p>
+    <div class="setup-step">
+      <strong>1. Crear cuenta en Supabase</strong>
+      Ingresá a <a href="https://supabase.com" target="_blank" style="color:var(--navy)">supabase.com</a> → New Project → elegí un nombre y contraseña
+    </div>
+    <div class="setup-step">
+      <strong>2. Obtener credenciales</strong>
+      En tu proyecto: Settings → API → copiá la "Project URL" y la "anon public" key
+    </div>
+    <div class="setup-step">
+      <strong>3. Crear las tablas</strong>
+      Entrá a SQL Editor y ejecutá el script <code>supabase_setup.sql</code> que viene junto a este archivo
+    </div>
+    <input type="text" id="setup-url" placeholder="Project URL (https://xxx.supabase.co)">
+    <input type="text" id="setup-key" placeholder="anon public key">
+    <div id="setup-error"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="saveSetup()">Guardar y continuar</button>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">RA</div>
+    <h1>Grupo RA</h1>
+    <p>Estudio de Cobranzas — Sistema de gestión</p>
+    <input type="text" id="login-email" placeholder="Email" autocomplete="username">
+    <input type="password" id="login-pass" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()">Ingresar</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading" style="display:none">
+  <div class="spinner"></div>
+  <span style="font-size:13px;color:var(--text-muted)">Cargando...</span>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <div class="brand-icon">RA</div>
+        <div class="brand-text"><strong>Grupo RA</strong><span>Estudio de Cobranzas</span></div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+      <button class="nav-item active" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard
+      </button>
+      <button class="nav-item" onclick="navigate('clientes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clientes
+      </button>
+      <button class="nav-item" onclick="navigate('nuevo')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>Nuevo expediente
+      </button>
+      <div class="nav-section-label">Gestión</div>
+      <button class="nav-item" id="nav-expediente" onclick="navigate('expediente')" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Expediente actual
+      </button>
+      <div class="nav-section-label">Sistema</div>
+      <button class="nav-item" onclick="navigate('config')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M22 12a10 10 0 0 1-20 0"/></svg>Configuración
+      </button>
+      <button class="nav-item" id="nav-admin" onclick="navigate('usuarios')" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Usuarios
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-info">
+          <strong id="user-name">...</strong>
+          <span id="user-role">...</span>
+        </div>
+        <button class="btn-logout" onclick="doLogout()" title="Cerrar sesión">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h2 id="page-title">Dashboard</h2>
+      </div>
+      <div class="topbar-right">
+        <span id="topbar-date" style="font-size:12px;color:var(--text-muted)"></span>
+        <button class="btn btn-primary btn-sm" onclick="navigate('nuevo')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuevo expediente
+        </button>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<!-- MODAL PAGO -->
+<div class="modal-overlay" id="modal-pago" style="display:none" onclick="if(event.target===this)closePagoModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Registrar pago</div>
+      <button class="modal-close" onclick="closePagoModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Cuota</label>
+        <select class="form-select" id="pago-cuota-sel"></select>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Fecha de pago</label><input type="date" class="form-input" id="pago-fecha"></div>
+        <div class="form-group"><label class="form-label">Monto recibido ($)</label><input type="number" class="form-input" id="pago-monto" placeholder="0.00"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Medio de pago</label>
+        <select class="form-select" id="pago-medio">
+          <option>Transferencia bancaria</option>
+          <option>Efectivo</option>
+          <option>Depósito bancario</option>
+          <option>Cheque</option>
+          <option>MercadoPago</option>
+          <option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Observaciones (opcional)</label>
+        <input type="text" class="form-input" id="pago-obs" placeholder="Ej: Comprobante #123">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closePagoModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarPago()">Confirmar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ========== CONFIG ==========
+const STUDY_INFO = {
+  nombre: 'Grupo RA — Estudio de Cobranzas',
+  tel: '11-2260-3029',
+  instagram: '@estudio_grupora',
+  web: 'grupora-raffoyasociados.netlify.app',
+  email: 'estudio@grupora.com'
+};
+
+let supabase = null;
+let currentUser = null;
+let currentUserProfile = null;
+let currentExpediente = null;
+let appConfig = {};
+
+// ========== INIT ==========
+async function init() {
+  const url = localStorage.getItem('sb_url');
+  const key = localStorage.getItem('sb_key');
+  if (!url || !key) {
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('login-screen').style.display = 'none';
+    return;
+  }
+  supabase = window.supabase.createClient(url, key);
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    await loginSuccess(session.user);
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+}
+
+async function saveSetup() {
+  const url = document.getElementById('setup-url').value.trim();
+  const key = document.getElementById('setup-key').value.trim();
+  if (!url || !key) { document.getElementById('setup-error').textContent = 'Completá ambos campos'; return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  supabase = window.supabase.createClient(url, key);
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  document.getElementById('login-error').textContent = '';
+  if (!email || !pass) { document.getElementById('login-error').textContent = 'Completá email y contraseña'; return; }
+  showLoading();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  hideLoading();
+  if (error) { document.getElementById('login-error').textContent = 'Email o contraseña incorrectos'; return; }
+  await loginSuccess(data.user);
+}
+
+async function loginSuccess(user) {
+  currentUser = user;
+  const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
+  currentUserProfile = profile || { nombre: user.email.split('@')[0], rol: 'usuario' };
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-name').textContent = currentUserProfile.nombre;
+  document.getElementById('user-role').textContent = currentUserProfile.rol === 'admin' ? 'Administrador' : 'Usuario';
+  document.getElementById('user-avatar').textContent = currentUserProfile.nombre.substring(0,2).toUpperCase();
+  if (currentUserProfile.rol === 'admin') document.getElementById('nav-admin').style.display = 'flex';
+  await loadConfig();
+  navigate('dashboard');
+  setInterval(updateClock, 1000); updateClock();
+}
+
+async function doLogout() {
+  await supabase.auth.signOut();
+  location.reload();
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('topbar-date').textContent = now.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' — ' + now.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadConfig() {
+  const { data } = await supabase.from('config').select('*');
+  if (data) data.forEach(r => appConfig[r.clave] = r.valor);
+  if (!appConfig.mora_diaria) appConfig.mora_diaria = '0.5';
+  if (!appConfig.quita_contado) appConfig.quita_contado = '20';
+}
+
+// ========== NAVIGATION ==========
+const PAGE_TITLES = { dashboard:'Dashboard', clientes:'Clientes', nuevo:'Nuevo expediente', expediente:'Expediente', config:'Configuración', usuarios:'Usuarios' };
+
+function navigate(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navBtn = document.querySelector(`[onclick="navigate('${page}')"]`);
+  if (navBtn) navBtn.classList.add('active');
+  document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+  if (page === 'dashboard') renderDashboard();
+  else if (page === 'clientes') renderClientes();
+  else if (page === 'nuevo') renderNuevo();
+  else if (page === 'expediente') renderExpediente();
+  else if (page === 'config') renderConfig();
+  else if (page === 'usuarios') renderUsuarios();
+}
+
+// ========== HELPERS ==========
+const fmt = n => isNaN(n) ? '$0,00' : '$' + Number(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('es-AR') : '-';
+function showLoading() { document.getElementById('loading').style.display = 'flex'; }
+function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = `toast-item toast-${type}`;
+  el.textContent = msg;
+  t.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function calcMoraAcumulada(cuota) {
+  if (cuota.estado !== 'mora' && cuota.estado !== 'pendiente') return 0;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const venc = new Date(cuota.fecha_vencimiento+'T12:00:00'); venc.setHours(0,0,0,0);
+  if (hoy <= venc) return 0;
+  const dias = Math.floor((hoy - venc) / 86400000);
+  const tasa = parseFloat(appConfig.mora_diaria || 0.5) / 100;
+  return cuota.monto * tasa * dias;
+}
+
+function calcCuotasSaldoDecreciente(capital, tasaTotal, ncuotas) {
+  // Interés sobre saldo decreciente
+  const cuotas = [];
+  let saldo = capital;
+  const amort = capital / ncuotas;
+  const tasa_mensual = tasaTotal / ncuotas;
+  let total = 0;
+  for (let i = 0; i < ncuotas; i++) {
+    const interes = saldo * tasa_mensual;
+    const cuota = amort + interes;
+    total += cuota;
+    cuotas.push(parseFloat(cuota.toFixed(2)));
+    saldo -= amort;
+  }
+  return { cuotas, total: parseFloat(total.toFixed(2)) };
+}
+
+// ========== DASHBOARD ==========
+async function renderDashboard() {
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="spinner" style="margin:40px auto;width:32px;height:32px;border-width:3px"></div>';
+  const hoy = new Date().toISOString().split('T')[0];
+  const en7 = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
+  const [expRes, cuotasMoraRes, cuotasProxRes, pagosMesRes] = await Promise.all([
+    supabase.from('expedientes').select('id,estado,deuda_total').eq('estado','activo'),
+    supabase.from('cuotas').select('*,expedientes(nombre_cliente)').lte('fecha_vencimiento',hoy).eq('estado','pendiente'),
+    supabase.from('cuotas').select('*,expedientes(nombre_cliente,entidad_acreedora)').gte('fecha_vencimiento',hoy).lte('fecha_vencimiento',en7).eq('estado','pendiente').order('fecha_vencimiento'),
+    supabase.from('pagos').select('monto').gte('fecha_pago', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
+  ]);
+  const exps = expRes.data || [];
+  const cuotasMora = cuotasMoraRes.data || [];
+  const cuotasProx = cuotasProxRes.data || [];
+  const pagosMes = pagosMesRes.data || [];
+  const totalCartera = exps.reduce((a,e) => a + parseFloat(e.deuda_total||0), 0);
+  const totalMes = pagosMes.reduce((a,p) => a + parseFloat(p.monto||0), 0);
+
+  let alertHtml = cuotasMora.length > 0 ? `<div class="alert alert-danger">⚠️ <strong>${cuotasMora.length} cuota${cuotasMora.length>1?'s':''} vencida${cuotasMora.length>1?'s':''}</strong> sin registrar pago — mora automática en curso (${appConfig.mora_diaria||0.5}% diario).</div>` : '';
+
+  let proxHtml = cuotasProx.length === 0 ? '<div class="empty-state"><p>Sin vencimientos en los próximos 7 días</p></div>' :
+    cuotasProx.map(c => {
+      const dias = Math.floor((new Date(c.fecha_vencimiento+'T12:00:00') - new Date()) / 86400000);
+      const esHoy = c.fecha_vencimiento === hoy;
+      return `<tr>
+        <td><strong>${c.expedientes?.nombre_cliente||'-'}</strong></td>
+        <td>${c.expedientes?.entidad_acreedora||'-'}</td>
+        <td>${fmtDate(c.fecha_vencimiento)}</td>
+        <td>${fmt(c.monto)}</td>
+        <td>${esHoy ? '<span class="badge badge-warning">Vence hoy</span>' : `<span class="badge badge-info">En ${dias} días</span>`}</td>
+        <td><button class="btn btn-sm" onclick="abrirExpediente('${c.expediente_id}')">Ver</button></td>
+      </tr>`;
+    }).join('');
+
+  let moraHtml = cuotasMora.length === 0 ? '' : cuotasMora.slice(0,5).map(c => {
+    const mora = calcMoraAcumulada(c);
+    return `<tr>
+      <td><strong>${c.expedientes?.nombre_cliente||'-'}</strong></td>
+      <td>${fmtDate(c.fecha_vencimiento)}</td>
+      <td>${fmt(c.monto)}</td>
+      <td style="color:var(--danger);font-weight:600">${fmt(mora)}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="abrirExpediente('${c.expediente_id}')">Registrar pago</button></td>
+    </tr>`;
+  }).join('');
+
+  content.innerHTML = `
+    ${alertHtml}
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Expedientes activos</div><div class="stat-value">${exps.length}</div></div>
+      <div class="stat-card s-danger"><div class="stat-label">Cuotas en mora</div><div class="stat-value">${cuotasMora.length}</div><div class="stat-sub">${appConfig.mora_diaria||0.5}% diario</div></div>
+      <div class="stat-card s-success"><div class="stat-label">Cobrado este mes</div><div class="stat-value">${fmt(totalMes)}</div></div>
+      <div class="stat-card s-gold"><div class="stat-label">Cartera total</div><div class="stat-value">${fmt(totalCartera)}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Próximos vencimientos (7 días)</div></div>
+        <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Entidad</th><th>Vence</th><th>Monto</th><th>Estado</th><th></th></tr></thead><tbody>${proxHtml}</tbody></table></div>
+      </div>
+      ${cuotasMora.length > 0 ? `<div class="card">
+        <div class="card-header"><div class="card-title" style="color:var(--danger)">⚠ Cuotas en mora</div></div>
+        <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Vencimiento</th><th>Cuota</th><th>Mora acum.</th><th></th></tr></thead><tbody>${moraHtml}</tbody></table></div>
+      </div>` : '<div class="card"><div class="card-body"><div class="empty-state"><p style="color:var(--success);font-weight:600">✓ Sin cuotas en mora</p></div></div></div>'}
+    </div>`;
+}
+
+// ========== CLIENTES ==========
+async function renderClientes() {
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="spinner" style="margin:40px auto;width:32px;height:32px;border-width:3px"></div>';
+  const { data } = await supabase.from('expedientes').select('*').order('created_at',{ascending:false});
+  const exps = data || [];
+  const rows = exps.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:40px">Sin expedientes registrados</td></tr>' :
+    exps.map(e => {
+      const badge = e.estado === 'activo' ? 'badge-success' : e.estado === 'mora' ? 'badge-danger' : e.estado === 'cancelado' ? 'badge-gray' : 'badge-warning';
+      const label = e.estado === 'activo' ? 'Al día' : e.estado === 'mora' ? 'En mora' : e.estado === 'cancelado' ? 'Cancelado' : 'Prejudicial';
+      return `<tr>
+        <td style="color:var(--text-muted);font-size:11px">${e.numero_exp||'-'}</td>
+        <td><strong>${e.nombre_cliente}</strong><br><span style="font-size:11px;color:var(--text-muted)">${e.email||''}</span></td>
+        <td>${e.dni||'-'}</td>
+        <td>${e.entidad_acreedora||'-'}</td>
+        <td>${fmt(e.deuda_total)}</td>
+        <td>${e.plan_descripcion||'-'}</td>
+        <td><span class="badge ${badge}">${label}</span></td>
+        <td><button class="btn btn-sm" onclick="abrirExpediente('${e.id}')">Ver expediente</button></td>
+      </tr>`;
+    }).join('');
+  content.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Todos los expedientes</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" id="search-clientes" placeholder="Buscar..." style="width:220px" oninput="filtrarClientes()" >
+          <select class="form-select" id="filter-estado" style="width:140px" onchange="filtrarClientes()">
+            <option value="">Todos</option><option value="activo">Al día</option><option value="mora">En mora</option><option value="cancelado">Cancelado</option><option value="prejudicial">Prejudicial</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap"><table id="tabla-clientes"><thead><tr><th>N° Exp.</th><th>Cliente</th><th>DNI</th><th>Entidad</th><th>Deuda total</th><th>Plan</th><th>Estado</th><th></th></tr></thead><tbody id="tbody-clientes">${rows}</tbody></table></div>
+    </div>`;
+  window._clientesData = exps;
+}
+
+function filtrarClientes() {
+  const q = document.getElementById('search-clientes')?.value.toLowerCase() || '';
+  const est = document.getElementById('filter-estado')?.value || '';
+  const tbody = document.getElementById('tbody-clientes');
+  if (!tbody || !window._clientesData) return;
+  const filtered = window._clientesData.filter(e =>
+    (!q || e.nombre_cliente?.toLowerCase().includes(q) || e.dni?.includes(q) || e.entidad_acreedora?.toLowerCase().includes(q) || e.numero_exp?.toLowerCase().includes(q)) &&
+    (!est || e.estado === est)
+  );
+  tbody.innerHTML = filtered.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px">Sin resultados</td></tr>' :
+    filtered.map(e => {
+      const badge = e.estado === 'activo' ? 'badge-success' : e.estado === 'mora' ? 'badge-danger' : e.estado === 'cancelado' ? 'badge-gray' : 'badge-warning';
+      const label = e.estado === 'activo' ? 'Al día' : e.estado === 'mora' ? 'En mora' : e.estado === 'cancelado' ? 'Cancelado' : 'Prejudicial';
+      return `<tr><td style="color:var(--text-muted);font-size:11px">${e.numero_exp||'-'}</td><td><strong>${e.nombre_cliente}</strong><br><span style="font-size:11px;color:var(--text-muted)">${e.email||''}</span></td><td>${e.dni||'-'}</td><td>${e.entidad_acreedora||'-'}</td><td>${fmt(e.deuda_total)}</td><td>${e.plan_descripcion||'-'}</td><td><span class="badge ${badge}">${label}</span></td><td><button class="btn btn-sm" onclick="abrirExpediente('${e.id}')">Ver</button></td></tr>`;
+    }).join('');
+}
+
+// ========== NUEVO EXPEDIENTE ==========
+function renderNuevo() {
+  const tasas = { 2: appConfig.tasa_2||5, 3: appConfig.tasa_3||8, 4: appConfig.tasa_4||10, 6: appConfig.tasa_6||15, 9: appConfig.tasa_9||20, 10: appConfig.tasa_10||23, 12: appConfig.tasa_12||27 };
+  document.getElementById('content').innerHTML = `
+  <div class="card">
+    <div class="card-body">
+      <div class="section-divider">👤 Datos del cliente</div>
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="form-group"><label class="form-label">Apellido y nombre *</label><input type="text" class="form-input" id="f-nombre" placeholder="García, Juan Alberto"></div>
+        <div class="form-group"><label class="form-label">DNI / CUIL *</label><input type="text" class="form-input" id="f-dni" placeholder="25.487.312"></div>
+        <div class="form-group"><label class="form-label">Teléfono principal</label><input type="text" class="form-input" id="f-tel1" placeholder="11 4523-1234"></div>
+        <div class="form-group"><label class="form-label">Teléfono alternativo</label><input type="text" class="form-input" id="f-tel2"></div>
+        <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="f-email" placeholder="cliente@mail.com"></div>
+        <div class="form-group"><label class="form-label">Domicilio</label><input type="text" class="form-input" id="f-domicilio" placeholder="Av. Corrientes 1234, CABA"></div>
+      </div>
+
+      <div class="section-divider">🏦 Deuda y conceptos</div>
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="form-group"><label class="form-label">Entidad / Persona acreedora *</label><input type="text" class="form-input" id="f-entidad" placeholder="Banco Nación"></div>
+        <div class="form-group"><label class="form-label">Deuda original ($) *</label><input type="number" class="form-input" id="f-deuda" placeholder="0" oninput="recalcularTotal()"></div>
+        <div class="form-group"><label class="form-label">Fecha de la deuda</label><input type="date" class="form-input" id="f-fecha-deuda"></div>
+        <div class="form-group"><label class="form-label">Tasa de mora por defecto (%/día)</label><input type="number" class="form-input" id="f-mora" value="${appConfig.mora_diaria||0.5}" step="0.01"></div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px">Conceptos adicionales</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <label class="check-row"><input type="checkbox" id="cb-admin" onchange="recalcularTotal()" checked>&nbsp;Gastos administrativos&nbsp;<input type="number" class="form-input" id="f-admin" placeholder="$" style="width:110px;margin-left:auto" oninput="recalcularTotal()"></label>
+        <label class="check-row"><input type="checkbox" id="cb-gestion" onchange="recalcularTotal()" checked>&nbsp;Gestión de cobranza&nbsp;<input type="number" class="form-input" id="f-gestion" placeholder="$" style="width:110px;margin-left:auto" oninput="recalcularTotal()"></label>
+        <label class="check-row"><input type="checkbox" id="cb-honor" onchange="recalcularTotal()" checked>&nbsp;Honorarios profesionales&nbsp;<input type="number" class="form-input" id="f-honor" placeholder="$" style="width:110px;margin-left:auto" oninput="recalcularTotal()"></label>
+        <label class="check-row"><input type="checkbox" id="cb-otro" onchange="recalcularTotal()">&nbsp;<input type="text" class="form-input" id="f-otro-concepto" placeholder="Otro concepto..." style="width:130px">&nbsp;<input type="number" class="form-input" id="f-otro" placeholder="$" style="width:90px" oninput="recalcularTotal()"></label>
+      </div>
+      <div style="background:var(--navy-light);border-radius:var(--radius);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border:1px solid #c8d8f0">
+        <span style="font-size:13px;color:var(--text-muted);font-weight:500">Total a regularizar</span>
+        <span style="font-size:20px;font-weight:700;color:var(--navy)" id="total-display">$0,00</span>
+      </div>
+
+      <div class="section-divider">💳 Plan de pagos</div>
+      <div id="planes-container">
+        <div class="plan-option selected" data-plan="contado" onclick="seleccionarPlan(this,'contado')">
+          <div class="plan-header"><span class="plan-name">💵 Pago contado — quita especial (${appConfig.quita_contado||20}%)</span><span class="plan-cuota" id="plan-contado-val">$0,00</span></div>
+          <div class="plan-detail">Descuento del ${appConfig.quita_contado||20}% sobre intereses y costas · Pago único</div>
+        </div>
+        ${[2,3,4,6,9,10,12].map(n => `
+        <div class="plan-option" data-plan="${n}" onclick="seleccionarPlan(this,'${n}')">
+          <div class="plan-header"><span class="plan-name">${n} cuotas</span><span class="plan-cuota" id="plan-${n}-val">$0,00 / cuota</span></div>
+          <div class="plan-detail" id="plan-${n}-det">Tasa: ${tasas[n]}% sobre saldo decreciente</div>
+        </div>`).join('')}
+      </div>
+      <input type="hidden" id="plan-seleccionado" value="contado">
+      <input type="hidden" id="plan-total" value="0">
+
+      <div class="section-divider">📋 Documentación</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <label class="check-row"><input type="checkbox" id="cb-pagare">&nbsp;Firma de pagaré</label>
+        <label class="check-row"><input type="checkbox" id="cb-convenio">&nbsp;Firma de convenio de pago</label>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Observaciones internas</label>
+        <input type="text" class="form-input" id="f-obs" placeholder="Notas internas sobre el expediente">
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn" onclick="navigate('clientes')">Cancelar</button>
+        <button class="btn btn-primary" onclick="crearExpediente()">💾 Crear expediente</button>
+      </div>
+    </div>
+  </div>`;
+  recalcularTotal();
+}
+
+let _planSelData = {};
+function recalcularTotal() {
+  const deuda = parseFloat(document.getElementById('f-deuda')?.value)||0;
+  const admin = document.getElementById('cb-admin')?.checked ? (parseFloat(document.getElementById('f-admin')?.value)||0) : 0;
+  const gestion = document.getElementById('cb-gestion')?.checked ? (parseFloat(document.getElementById('f-gestion')?.value)||0) : 0;
+  const honor = document.getElementById('cb-honor')?.checked ? (parseFloat(document.getElementById('f-honor')?.value)||0) : 0;
+  const otro = document.getElementById('cb-otro')?.checked ? (parseFloat(document.getElementById('f-otro')?.value)||0) : 0;
+  const total = deuda + admin + gestion + honor + otro;
+  document.getElementById('total-display').textContent = fmt(total);
+  const quita = parseFloat(appConfig.quita_contado||20)/100;
+  const contado = total * (1 - quita);
+  const el = document.getElementById('plan-contado-val');
+  if (el) el.textContent = fmt(contado);
+  _planSelData = {};
+  _planSelData['contado'] = { total: contado, cuota: contado, ncuotas: 1, tasa: 0 };
+  const tasas = { 2: parseFloat(appConfig.tasa_2||5)/100, 3: parseFloat(appConfig.tasa_3||8)/100, 4: parseFloat(appConfig.tasa_4||10)/100, 6: parseFloat(appConfig.tasa_6||15)/100, 9: parseFloat(appConfig.tasa_9||20)/100, 10: parseFloat(appConfig.tasa_10||23)/100, 12: parseFloat(appConfig.tasa_12||27)/100 };
+  [2,3,4,6,9,10,12].forEach(n => {
+    const res = calcCuotasSaldoDecreciente(total, tasas[n], n);
+    const primeraCuota = res.cuotas[0];
+    _planSelData[n] = { total: res.total, cuotas: res.cuotas, ncuotas: n, tasa: tasas[n]*100 };
+    const elV = document.getElementById(`plan-${n}-val`);
+    const elD = document.getElementById(`plan-${n}-det`);
+    if (elV) elV.textContent = fmt(primeraCuota) + ' / cuota';
+    if (elD) elD.textContent = `Tasa: ${tasas[n]*100}% · Total: ${fmt(res.total)} (saldo decreciente)`;
+  });
+  const planSel = document.getElementById('plan-seleccionado')?.value;
+  if (planSel && _planSelData[planSel]) {
+    document.getElementById('plan-total').value = _planSelData[planSel].total;
+  }
+}
+
+function seleccionarPlan(el, plan) {
+  document.querySelectorAll('.plan-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('plan-seleccionado').value = plan;
+  document.getElementById('plan-total').value = _planSelData[plan]?.total || 0;
+}
+
+async function crearExpediente() {
+  const nombre = document.getElementById('f-nombre').value.trim();
+  const dni = document.getElementById('f-dni').value.trim();
+  const entidad = document.getElementById('f-entidad').value.trim();
+  const deuda = parseFloat(document.getElementById('f-deuda').value)||0;
+  if (!nombre || !dni || !entidad || deuda === 0) { toast('Completá los campos obligatorios (*)','error'); return; }
+
+  showLoading();
+  const admin = document.getElementById('cb-admin').checked ? (parseFloat(document.getElementById('f-admin').value)||0) : 0;
+  const gestion = document.getElementById('cb-gestion').checked ? (parseFloat(document.getElementById('f-gestion').value)||0) : 0;
+  const honor = document.getElementById('cb-honor').checked ? (parseFloat(document.getElementById('f-honor').value)||0) : 0;
+  const otro = document.getElementById('cb-otro').checked ? (parseFloat(document.getElementById('f-otro').value)||0) : 0;
+  const otroConcepto = document.getElementById('f-otro-concepto').value.trim();
+  const totalReg = deuda + admin + gestion + honor + otro;
+  const planSel = document.getElementById('plan-seleccionado').value;
+  const planData = _planSelData[planSel];
+  const planDesc = planSel === 'contado' ? 'Pago contado' : `${planSel} cuotas`;
+
+  // Get next exp number
+  const { count } = await supabase.from('expedientes').select('id', { count: 'exact', head: true });
+  const numExp = 'EXP-' + String((count||0)+1).padStart(3,'0');
+
+  const expData = {
+    numero_exp: numExp, nombre_cliente: nombre, dni, email: document.getElementById('f-email').value.trim(),
+    telefono1: document.getElementById('f-tel1').value.trim(), telefono2: document.getElementById('f-tel2').value.trim(),
+    domicilio: document.getElementById('f-domicilio').value.trim(), entidad_acreedora: entidad,
+    deuda_original: deuda, gastos_admin: admin, gestion_cobranza: gestion, honorarios: honor,
+    otro_concepto_nombre: otroConcepto, otro_concepto_monto: otro,
+    deuda_total: totalReg, plan_tipo: planSel, plan_descripcion: planDesc,
+    plan_total: planData?.total||totalReg, ncuotas: planData?.ncuotas||1, tasa: planData?.tasa||0,
+    firma_pagare: document.getElementById('cb-pagare').checked, firma_convenio: document.getElementById('cb-convenio').checked,
+    mora_diaria: parseFloat(document.getElementById('f-mora').value)||0.5,
+    fecha_deuda: document.getElementById('f-fecha-deuda').value||null,
+    observaciones: document.getElementById('f-obs').value.trim(),
+    estado: 'activo', registrado_por: currentUserProfile.nombre, registrado_por_id: currentUser.id
+  };
+
+  const { data: newExp, error } = await supabase.from('expedientes').insert(expData).select().single();
+  if (error) { hideLoading(); toast('Error al crear expediente: '+error.message,'error'); return; }
+
+  // Generar cuotas
+  const cuotas = [];
+  const hoy = new Date(); hoy.setDate(5);
+  if (planSel === 'contado') {
+    cuotas.push({ expediente_id: newExp.id, numero: 1, monto: planData.total, fecha_vencimiento: new Date().toISOString().split('T')[0], estado: 'pendiente', es_mora: false });
+  } else {
+    for (let i = 0; i < planData.ncuotas; i++) {
+      const fv = new Date(hoy); fv.setMonth(fv.getMonth() + i + 1);
+      cuotas.push({ expediente_id: newExp.id, numero: i+1, monto: planData.cuotas[i], fecha_vencimiento: fv.toISOString().split('T')[0], estado: 'pendiente', es_mora: false });
+    }
+  }
+  await supabase.from('cuotas').insert(cuotas);
+  hideLoading();
+  toast(`Expediente ${numExp} creado correctamente`);
+  currentExpediente = newExp.id;
+  document.getElementById('nav-expediente').style.display = 'flex';
+  navigate('expediente');
+}
+
+// ========== EXPEDIENTE ==========
+async function abrirExpediente(id) {
+  currentExpediente = id;
+  document.getElementById('nav-expediente').style.display = 'flex';
+  navigate('expediente');
+}
+
+async function renderExpediente() {
+  if (!currentExpediente) { navigate('clientes'); return; }
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="spinner" style="margin:40px auto;width:32px;height:32px;border-width:3px"></div>';
+  const [expRes, cuotasRes, pagosRes] = await Promise.all([
+    supabase.from('expedientes').select('*').eq('id', currentExpediente).single(),
+    supabase.from('cuotas').select('*').eq('expediente_id', currentExpediente).order('numero'),
+    supabase.from('pagos').select('*').eq('expediente_id', currentExpediente).order('created_at')
+  ]);
+  const exp = expRes.data;
+  const cuotas = cuotasRes.data || [];
+  const pagos = pagosRes.data || [];
+  if (!exp) { toast('Expediente no encontrado','error'); navigate('clientes'); return; }
+  document.getElementById('page-title').textContent = `${exp.numero_exp} — ${exp.nombre_cliente}`;
+
+  const pagadas = cuotas.filter(c => c.estado === 'pagada').length;
+  const totalPagado = pagos.reduce((a,p) => a + parseFloat(p.monto||0), 0);
+  const moraTotal = cuotas.filter(c => c.estado === 'pendiente' || c.estado === 'mora').reduce((a,c) => a + calcMoraAcumulada(c), 0);
+  const saldoPendiente = parseFloat(exp.plan_total||exp.deuda_total) - totalPagado + moraTotal;
+  const progreso = Math.min(100, (totalPagado / parseFloat(exp.plan_total||exp.deuda_total||1))*100);
+  const hoy = new Date().toISOString().split('T')[0];
+  const ultimaCuota = cuotas[cuotas.length-1];
+
+  // Actualizar estados de mora
+  for (const c of cuotas) {
+    if (c.estado === 'pendiente' && c.fecha_vencimiento < hoy) {
+      await supabase.from('cuotas').update({ estado: 'mora' }).eq('id', c.id);
+      c.estado = 'mora';
+      if (exp.estado === 'activo') await supabase.from('expedientes').update({ estado: 'mora' }).eq('id', exp.id);
+    }
+  }
+
+  const cuotasHtml = cuotas.map(c => {
+    const mora = calcMoraAcumulada(c);
+    const pago = pagos.find(p => p.cuota_id === c.id);
+    const rowClass = c.estado === 'mora' ? 'mora' : c.estado === 'pagada' ? 'pagada' : '';
+    const badgeClass = c.estado === 'pagada' ? 'badge-success' : c.estado === 'mora' ? 'badge-danger' : 'badge-gray';
+    const badgeLabel = c.estado === 'pagada' ? 'Pagada' : c.estado === 'mora' ? 'En mora' : 'Pendiente';
+    return `<div class="cuota-row-item ${rowClass}">
+      <div style="font-weight:600">${c.numero}/${cuotas.length}</div>
+      <div>${fmtDate(c.fecha_vencimiento)}</div>
+      <div>${fmt(c.monto)}${mora > 0 ? `<br><span style="font-size:10px;color:var(--danger)">+${fmt(mora)} mora</span>` : ''}</div>
+      <div><span class="badge ${badgeClass}" style="font-size:10px">${badgeLabel}</span></div>
+      <div>${pago ? fmtDate(pago.fecha_pago) : '-'}</div>
+      <div style="font-size:11px;color:var(--text-muted)">${pago ? `${fmt(pago.monto)} · ${pago.medio}` : (c.estado !== 'pagada' ? `<button class="btn btn-sm btn-primary" onclick="abrirPago('${c.id}','${c.numero}',${c.monto},${mora})">Pagar</button>` : '')}</div>
+    </div>`;
+  }).join('');
+
+  const pagosHtml = pagos.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Sin pagos registrados</td></tr>' :
+    pagos.map(p => `<tr><td>${fmtDate(p.fecha_pago)}</td><td>${fmt(p.monto)}</td><td>${p.medio||'-'}</td><td>${p.observaciones||'-'}</td><td style="font-size:11px;color:var(--text-muted)">${p.registrado_por||'-'}</td></tr>`).join('');
+
+  const moraAlerts = cuotas.filter(c => c.estado === 'mora').map(c => {
+    const dias = Math.floor((new Date() - new Date(c.fecha_vencimiento+'T12:00:00')) / 86400000);
+    const mora = calcMoraAcumulada(c);
+    return `<div class="alert alert-danger">⚠ Cuota ${c.numero}/${cuotas.length} vencida el ${fmtDate(c.fecha_vencimiento)} — <strong>${dias} día${dias!==1?'s':''} de mora</strong> · Mora acumulada: <strong>${fmt(mora)}</strong> (${exp.mora_diaria||0.5}%/día)</div>`;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="exp-header">
+      <div class="exp-header-item"><div class="label">Expediente</div><div class="value">${exp.numero_exp}</div></div>
+      <div class="exp-header-item"><div class="label">Cliente</div><div class="value">${exp.nombre_cliente}</div><div style="font-size:11px;opacity:0.6">${exp.entidad_acreedora}</div></div>
+      <div class="exp-header-item"><div class="label">Saldo pendiente</div><div class="value big">${fmt(saldoPendiente)}</div><div style="font-size:11px;opacity:0.6">${pagadas}/${cuotas.length} cuotas pagas</div></div>
+      <div class="exp-header-item"><div class="label">Registrado por</div><div class="value" style="font-size:12px">${exp.registrado_por||'-'}</div><div style="font-size:11px;opacity:0.6">${fmtDate(exp.created_at?.split('T')[0])}</div></div>
+    </div>
+    ${moraAlerts}
+    <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Plan de pagos — ${exp.plan_descripcion}</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-gold btn-sm" onclick="descargarPDF('${exp.id}')">⬇ PDF</button>
+            <button class="btn btn-gold btn-sm" onclick="descargarExcel('${exp.id}')">⬇ Excel</button>
+          </div>
+        </div>
+        <div class="cuota-grid cuota-header"><div>Cuota</div><div>Vencimiento</div><div>Monto</div><div>Estado</div><div>Fecha pago</div><div>Detalle</div></div>
+        <div id="cuotas-list">${cuotasHtml}</div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header"><div class="card-title">Resumen financiero</div></div>
+          <div class="card-body">
+            <div class="mini-stat"><span class="mini-label">Deuda original</span><span class="mini-val">${fmt(exp.deuda_original)}</span></div>
+            ${exp.gastos_admin > 0 ? `<div class="mini-stat"><span class="mini-label">Gastos administrativos</span><span class="mini-val">${fmt(exp.gastos_admin)}</span></div>` : ''}
+            ${exp.gestion_cobranza > 0 ? `<div class="mini-stat"><span class="mini-label">Gestión de cobranza</span><span class="mini-val">${fmt(exp.gestion_cobranza)}</span></div>` : ''}
+            ${exp.honorarios > 0 ? `<div class="mini-stat"><span class="mini-label">Honorarios profesionales</span><span class="mini-val">${fmt(exp.honorarios)}</span></div>` : ''}
+            ${exp.otro_concepto_monto > 0 ? `<div class="mini-stat"><span class="mini-label">${exp.otro_concepto_nombre||'Otro'}</span><span class="mini-val">${fmt(exp.otro_concepto_monto)}</span></div>` : ''}
+            <div class="mini-stat"><span class="mini-label" style="font-weight:600">Total a regularizar</span><span class="mini-val" style="color:var(--navy)">${fmt(exp.deuda_total)}</span></div>
+            <div class="mini-stat"><span class="mini-label">Total convenio (${exp.plan_descripcion})</span><span class="mini-val">${fmt(exp.plan_total)}</span></div>
+            <div class="mini-stat"><span class="mini-label">Total pagado</span><span class="mini-val" style="color:var(--success)">${fmt(totalPagado)}</span></div>
+            ${moraTotal > 0 ? `<div class="mini-stat"><span class="mini-label">Mora acumulada</span><span class="mini-val" style="color:var(--danger)">${fmt(moraTotal)}</span></div>` : ''}
+            <div class="mini-stat"><span class="mini-label" style="font-weight:600">Saldo pendiente</span><span class="mini-val" style="color:var(--danger);font-size:15px">${fmt(saldoPendiente)}</span></div>
+            <div style="margin-top:12px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:4px"><span>Progreso</span><span>${Math.round(progreso)}%</span></div>
+              <div class="progress-wrap"><div class="progress-bar" style="width:${progreso}%"></div></div>
+            </div>
+            <div style="margin-top:14px;display:flex;gap:16px;font-size:12px;color:var(--text-muted)">
+              <span>${exp.firma_pagare ? '✅' : '☐'} Pagaré</span>
+              <span>${exp.firma_convenio ? '✅' : '☐'} Convenio</span>
+            </div>
+            ${ultimaCuota ? `<div style="margin-top:8px;font-size:11px;color:var(--text-muted)">📅 Fin estimado: ${fmtDate(ultimaCuota.fecha_vencimiento)}</div>` : ''}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Datos del cliente</div></div>
+          <div class="card-body" style="font-size:13px">
+            <div class="mini-stat"><span class="mini-label">DNI/CUIL</span><span>${exp.dni||'-'}</span></div>
+            <div class="mini-stat"><span class="mini-label">Teléfono</span><span>${exp.telefono1||'-'}${exp.telefono2?' / '+exp.telefono2:''}</span></div>
+            <div class="mini-stat"><span class="mini-label">Email</span><span>${exp.email||'-'}</span></div>
+            <div class="mini-stat"><span class="mini-label">Domicilio</span><span>${exp.domicilio||'-'}</span></div>
+            ${exp.observaciones ? `<div class="mini-stat"><span class="mini-label">Notas</span><span>${exp.observaciones}</span></div>` : ''}
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm btn-primary" onclick="descargarReporteCliente('${exp.id}')">📄 Reporte completo</button>
+              <button class="btn btn-sm" onclick="editarEstado('${exp.id}','${exp.estado}')">Cambiar estado</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Historial de pagos</div></div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Medio</th><th>Observaciones</th><th>Registrado por</th></tr></thead><tbody>${pagosHtml}</tbody></table></div>
+    </div>`;
+}
+
+// ========== MODAL PAGO ==========
+let _pagoData = {};
+function abrirPago(cuotaId, num, monto, mora) {
+  _pagoData = { cuotaId, num, monto, mora };
+  const sel = document.getElementById('pago-cuota-sel');
+  sel.innerHTML = `<option value="${cuotaId}">Cuota ${num} — ${fmt(monto)}${mora > 0 ? ` + ${fmt(mora)} mora = ${fmt(monto+mora)}` : ''}</option>`;
+  document.getElementById('pago-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pago-monto').value = (monto + mora).toFixed(2);
+  document.getElementById('pago-obs').value = '';
+  document.getElementById('modal-pago').style.display = 'flex';
+}
+function closePagoModal() { document.getElementById('modal-pago').style.display = 'none'; }
+
+async function confirmarPago() {
+  const fecha = document.getElementById('pago-fecha').value;
+  const monto = parseFloat(document.getElementById('pago-monto').value);
+  const medio = document.getElementById('pago-medio').value;
+  const obs = document.getElementById('pago-obs').value;
+  if (!fecha || !monto) { toast('Completá fecha y monto','error'); return; }
+  showLoading();
+  const { error } = await supabase.from('pagos').insert({
+    expediente_id: currentExpediente, cuota_id: _pagoData.cuotaId,
+    fecha_pago: fecha, monto, medio, observaciones: obs,
+    registrado_por: currentUserProfile.nombre, registrado_por_id: currentUser.id
+  });
+  if (!error) {
+    await supabase.from('cuotas').update({ estado: 'pagada' }).eq('id', _pagoData.cuotaId);
+    // Check if all paid
+    const { data: pendientes } = await supabase.from('cuotas').select('id').eq('expediente_id', currentExpediente).neq('estado','pagada');
+    if (pendientes && pendientes.length === 0) await supabase.from('expedientes').update({ estado: 'cancelado' }).eq('id', currentExpediente);
+    else await supabase.from('expedientes').update({ estado: 'activo' }).eq('id', currentExpediente);
+    closePagoModal();
+    toast('Pago registrado correctamente');
+    await renderExpediente();
+  } else { toast('Error al registrar pago','error'); }
+  hideLoading();
+}
+
+// ========== ESTADO ==========
+async function editarEstado(id, estadoActual) {
+  const nuevo = prompt(`Estado actual: ${estadoActual}\nNuevo estado (activo / mora / cancelado / prejudicial):`);
+  if (!nuevo) return;
+  const validos = ['activo','mora','cancelado','prejudicial'];
+  if (!validos.includes(nuevo.toLowerCase().trim())) { toast('Estado inválido','error'); return; }
+  await supabase.from('expedientes').update({ estado: nuevo.toLowerCase().trim() }).eq('id', id);
+  toast('Estado actualizado');
+  await renderExpediente();
+}
+
+// ========== CONFIG ==========
+async function renderConfig() {
+  const { data: users } = await supabase.from('users').select('*');
+  document.getElementById('content').innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Tasas e intereses</div></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div><div style="font-size:13px;font-weight:600">Mora diaria por defecto</div><div style="font-size:11px;color:var(--text-muted)">% diario sobre la cuota</div></div>
+          <div style="display:flex;align-items:center;gap:6px"><input type="number" class="form-input config-field" data-key="mora_diaria" value="${appConfig.mora_diaria||0.5}" step="0.01" style="width:90px;text-align:right"><span style="font-size:13px">%</span></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div><div style="font-size:13px;font-weight:600">Quita contado</div><div style="font-size:11px;color:var(--text-muted)">Descuento en pago único</div></div>
+          <div style="display:flex;align-items:center;gap:6px"><input type="number" class="form-input config-field" data-key="quita_contado" value="${appConfig.quita_contado||20}" style="width:90px;text-align:right"><span style="font-size:13px">%</span></div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px">Tasas por cuotas (% sobre saldo decreciente)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${[2,3,4,6,9,10,12].map(n => `<div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px">${n} cuotas</span>
+            <div style="display:flex;align-items:center;gap:4px"><input type="number" class="form-input config-field" data-key="tasa_${n}" value="${appConfig['tasa_'+n]||'-'}" style="width:80px;text-align:right"><span style="font-size:12px">%</span></div>
+          </div>`).join('')}
+        </div>
+        <div style="margin-top:16px;display:flex;justify-content:flex-end">
+          <button class="btn btn-primary" onclick="guardarConfig()">💾 Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Datos del estudio (en reportes)</div></div>
+      <div class="card-body" style="font-size:13px">
+        <div class="mini-stat"><span class="mini-label">Nombre</span><span>${STUDY_INFO.nombre}</span></div>
+        <div class="mini-stat"><span class="mini-label">Teléfono</span><span>${STUDY_INFO.tel}</span></div>
+        <div class="mini-stat"><span class="mini-label">Instagram</span><span>${STUDY_INFO.instagram}</span></div>
+        <div class="mini-stat"><span class="mini-label">Web</span><span>${STUDY_INFO.web}</span></div>
+        <div style="margin-top:14px;background:var(--navy-light);border-radius:var(--radius);padding:12px;font-size:12px;color:var(--text-muted)">
+          Para modificar los datos del estudio, editá la variable <code>STUDY_INFO</code> al inicio del archivo index.html
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function guardarConfig() {
+  showLoading();
+  const fields = document.querySelectorAll('.config-field');
+  for (const f of fields) {
+    const key = f.dataset.key;
+    const val = f.value;
+    await supabase.from('config').upsert({ clave: key, valor: val }, { onConflict: 'clave' });
+    appConfig[key] = val;
+  }
+  hideLoading();
+  toast('Configuración guardada');
+}
+
+// ========== USUARIOS ==========
+async function renderUsuarios() {
+  const { data: users } = await supabase.from('users').select('*');
+  const rows = (users||[]).map(u => `<tr><td>${u.nombre}</td><td>${u.email||'-'}</td><td><span class="badge ${u.rol==='admin'?'badge-warning':'badge-info'}">${u.rol}</span></td><td>${fmtDate(u.created_at?.split('T')[0])}</td></tr>`).join('');
+  document.getElementById('content').innerHTML = `
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Usuarios del sistema</div>
+      <button class="btn btn-primary btn-sm" onclick="invitarUsuario()">+ Invitar usuario</button>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Alta</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="card-body" style="border-top:1px solid var(--border)">
+      <div class="alert alert-info" style="margin:0">Para agregar usuarios: Supabase Dashboard → Authentication → Users → Invite User. Luego asignale nombre y rol en la tabla <code>users</code>.</div>
+    </div>
+  </div>`;
+}
+
+function invitarUsuario() {
+  alert('Para invitar usuarios:\n1. Entrá a tu proyecto en supabase.com\n2. Authentication → Users → Invite User\n3. Ingresá el email del usuario\n4. El usuario recibirá un correo para crear su contraseña\n5. Luego editá la tabla "users" en Supabase para asignarle nombre y rol');
+}
+
+// ========== PDF ==========
+async function descargarPDF(expId) {
+  showLoading();
+  const [expRes, cuotasRes, pagosRes] = await Promise.all([
+    supabase.from('expedientes').select('*').eq('id', expId).single(),
+    supabase.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
+    supabase.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
+  ]);
+  const exp = expRes.data; const cuotas = cuotasRes.data||[]; const pagos = pagosRes.data||[];
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  const W = 210; const M = 15;
+
+  // Header
+  doc.setFillColor(30, 58, 110);
+  doc.rect(0, 0, W, 38, 'F');
+  doc.setFillColor(201, 168, 76);
+  doc.rect(0, 38, W, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(201,168,76);
+  doc.text('GRUPO RA', M, 16);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(255,255,255);
+  doc.text('Estudio de Cobranzas', M, 23);
+  doc.setFontSize(9); doc.setTextColor(200,215,240);
+  doc.text(`Tel: ${STUDY_INFO.tel}  |  IG: ${STUDY_INFO.instagram}  |  ${STUDY_INFO.web}`, M, 30);
+  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  doc.text('PLAN DE PAGOS ACORDADO', W - M, 18, { align:'right' });
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(exp.numero_exp, W - M, 25, { align:'right' });
+  doc.text(new Date().toLocaleDateString('es-AR'), W - M, 31, { align:'right' });
+
+  let y = 50;
+  doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(30,58,110);
+  doc.text('DATOS DEL CLIENTE', M, y); y += 7;
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+  const campos = [
+    ['Cliente:', exp.nombre_cliente], ['DNI/CUIL:', exp.dni||'-'], ['Teléfono:', exp.telefono1||'-'],
+    ['Email:', exp.email||'-'], ['Domicilio:', exp.domicilio||'-'], ['Entidad acreedora:', exp.entidad_acreedora]
+  ];
+  campos.forEach(([l,v]) => {
+    doc.setFont('helvetica','bold'); doc.text(l, M, y);
+    doc.setFont('helvetica','normal'); doc.text(v||'-', M+38, y);
+    y += 6;
+  });
+
+  y += 4;
+  doc.setFillColor(30,58,110); doc.rect(M, y-4, W-M*2, 7, 'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('RESUMEN DE LA DEUDA', M+2, y+0.5);
+  y += 8; doc.setTextColor(40,40,40); doc.setFontSize(9.5);
+  const conceptos = [
+    ['Deuda original:', fmt(exp.deuda_original)],
+    ...(exp.gastos_admin > 0 ? [['Gastos administrativos:', fmt(exp.gastos_admin)]] : []),
+    ...(exp.gestion_cobranza > 0 ? [['Gestión de cobranza:', fmt(exp.gestion_cobranza)]] : []),
+    ...(exp.honorarios > 0 ? [['Honorarios profesionales:', fmt(exp.honorarios)]] : []),
+    ...(exp.otro_concepto_monto > 0 ? [[exp.otro_concepto_nombre||'Otro:', fmt(exp.otro_concepto_monto)]] : []),
+    ['TOTAL A REGULARIZAR:', fmt(exp.deuda_total)],
+    [`TOTAL CONVENIO (${exp.plan_descripcion}):`, fmt(exp.plan_total)]
+  ];
+  conceptos.forEach(([l,v], i) => {
+    if (i === conceptos.length - 2) { doc.setDrawColor(201,168,76); doc.line(M, y-1, W-M, y-1); doc.setFont('helvetica','bold'); }
+    if (i === conceptos.length - 1) { doc.setFont('helvetica','bold'); doc.setTextColor(30,58,110); }
+    doc.text(l, M, y);
+    doc.text(v, W-M, y, { align:'right' });
+    y += 6;
+  });
+
+  y += 4;
+  doc.setFillColor(30,58,110); doc.rect(M, y-4, W-M*2, 7, 'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('DETALLE DE CUOTAS', M+2, y+0.5); y += 8;
+  doc.setTextColor(40,40,40);
+  doc.autoTable({
+    startY: y, margin: { left: M, right: M },
+    head: [['N°','Vencimiento','Monto','Estado','Pago registrado','Medio']],
+    body: cuotas.map(c => {
+      const p = pagos.find(pg => pg.cuota_id === c.id);
+      const mora = calcMoraAcumulada(c);
+      return [
+        `${c.numero}/${cuotas.length}`, fmtDate(c.fecha_vencimiento),
+        fmt(c.monto) + (mora > 0 ? `\n+${fmt(mora)} mora` : ''),
+        c.estado === 'pagada' ? 'Pagado' : c.estado === 'mora' ? 'En mora' : 'Pendiente',
+        p ? fmtDate(p.fecha_pago) : '-', p ? p.medio : '-'
+      ];
+    }),
+    styles: { fontSize: 8.5, cellPadding: 3 },
+    headStyles: { fillColor: [30,58,110], textColor: 255, fontStyle:'bold' },
+    alternateRowStyles: { fillColor: [245,248,255] },
+    didDrawCell: (data) => {
+      if (data.section === 'body' && data.column.index === 3) {
+        const val = data.cell.text[0];
+        if (val === 'Pagado') data.cell.styles.textColor = [6,95,70];
+        if (val === 'En mora') data.cell.styles.textColor = [153,27,27];
+      }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Firma
+  if (y > 230) { doc.addPage(); y = 20; }
+  doc.setDrawColor(100,100,100);
+  doc.line(M, y+20, M+70, y+20); doc.line(W/2, y+20, W/2+70, y+20);
+  doc.setFontSize(9); doc.setTextColor(100,100,100);
+  doc.text('Firma del cliente', M, y+25); doc.text(`${exp.nombre_cliente} — ${exp.dni||'DNI'}`, M, y+30);
+  doc.text('Firma del profesional', W/2, y+25); doc.text('Grupo RA — Raffo & Asociados', W/2, y+30);
+
+  // Documentación
+  y += 38;
+  doc.setFontSize(9); doc.setTextColor(60,60,60);
+  doc.text(`${exp.firma_pagare ? '☑' : '☐'} Firma de pagaré   ${exp.firma_convenio ? '☑' : '☐'} Firma de convenio de pago`, M, y);
+  y += 6;
+  doc.setFontSize(8); doc.setTextColor(130,130,130);
+  doc.text(`Registrado por: ${exp.registrado_por||'-'} · ${new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}`, M, y);
+
+  // Footer
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(30,58,110); doc.rect(0, 287, W, 10, 'F');
+    doc.setFontSize(7); doc.setTextColor(200,215,240);
+    doc.text(`${STUDY_INFO.nombre}  ·  ${STUDY_INFO.tel}  ·  ${STUDY_INFO.web}`, W/2, 293, { align:'center' });
+  }
+  doc.save(`${exp.numero_exp}_${exp.nombre_cliente.replace(/\s/g,'_')}_plan_pagos.pdf`);
+  hideLoading(); toast('PDF descargado');
+}
+
+async function descargarReporteCliente(expId) {
+  showLoading();
+  const [expRes, cuotasRes, pagosRes] = await Promise.all([
+    supabase.from('expedientes').select('*').eq('id', expId).single(),
+    supabase.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
+    supabase.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
+  ]);
+  const exp = expRes.data; const cuotas = cuotasRes.data||[]; const pagos = pagosRes.data||[];
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  const W = 210; const M = 15;
+  const totalPagado = pagos.reduce((a,p) => a + parseFloat(p.monto||0), 0);
+  const moraTotal = cuotas.filter(c => c.estado!=='pagada').reduce((a,c) => a + calcMoraAcumulada(c), 0);
+
+  // Header identico
+  doc.setFillColor(30, 58, 110); doc.rect(0, 0, W, 38, 'F');
+  doc.setFillColor(201, 168, 76); doc.rect(0, 38, W, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(201,168,76);
+  doc.text('GRUPO RA', M, 16);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(255,255,255);
+  doc.text('Estudio de Cobranzas', M, 23);
+  doc.setFontSize(9); doc.setTextColor(200,215,240);
+  doc.text(`Tel: ${STUDY_INFO.tel}  |  IG: ${STUDY_INFO.instagram}  |  ${STUDY_INFO.web}`, M, 30);
+  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  doc.text('REPORTE DE EXPEDIENTE', W-M, 18, { align:'right' });
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(exp.numero_exp, W-M, 25, { align:'right' });
+  doc.text(new Date().toLocaleDateString('es-AR'), W-M, 31, { align:'right' });
+
+  let y = 50;
+  // Datos cliente
+  doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(30,58,110);
+  doc.text('DATOS DEL EXPEDIENTE', M, y); y += 7;
+  doc.setFontSize(9.5); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+  [['Cliente:',exp.nombre_cliente],['DNI/CUIL:',exp.dni||'-'],['Teléfono:',exp.telefono1||'-'],['Email:',exp.email||'-'],
+   ['Entidad acreedora:',exp.entidad_acreedora],['Plan:',exp.plan_descripcion],
+   ['Registrado por:',exp.registrado_por||'-'],['Fecha alta:',fmtDate(exp.created_at?.split('T')[0])],
+   ['Estado:',exp.estado]].forEach(([l,v]) => {
+    doc.setFont('helvetica','bold'); doc.text(l, M, y);
+    doc.setFont('helvetica','normal'); doc.text(v||'-', M+42, y); y += 6;
+  });
+
+  y += 4;
+  // Conceptos
+  doc.autoTable({
+    startY: y, margin:{left:M,right:M},
+    head:[['Concepto','Monto']],
+    body:[
+      ['Deuda original', fmt(exp.deuda_original)],
+      ...(exp.gastos_admin>0?[['Gastos administrativos',fmt(exp.gastos_admin)]]:[]),
+      ...(exp.gestion_cobranza>0?[['Gestión de cobranza',fmt(exp.gestion_cobranza)]]:[]),
+      ...(exp.honorarios>0?[['Honorarios profesionales',fmt(exp.honorarios)]]:[]),
+      ...(exp.otro_concepto_monto>0?[[exp.otro_concepto_nombre||'Otro',fmt(exp.otro_concepto_monto)]]:[]),
+      ['TOTAL A REGULARIZAR', fmt(exp.deuda_total)],
+      [`TOTAL CONVENIO (${exp.plan_descripcion})`, fmt(exp.plan_total)],
+      ['Total pagado', fmt(totalPagado)],
+      ...(moraTotal>0?[['Mora acumulada',fmt(moraTotal)]]:[]),
+      ['SALDO PENDIENTE', fmt(parseFloat(exp.plan_total)-totalPagado+moraTotal)]
+    ],
+    styles:{fontSize:9,cellPadding:3},
+    headStyles:{fillColor:[30,58,110],textColor:255},
+    alternateRowStyles:{fillColor:[245,248,255]}
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // Cuotas
+  doc.autoTable({
+    startY: y, margin:{left:M,right:M},
+    head:[['N°','Vencimiento','Monto','Estado']],
+    body: cuotas.map(c => {
+      const mora = calcMoraAcumulada(c);
+      return [`${c.numero}/${cuotas.length}`, fmtDate(c.fecha_vencimiento), fmt(c.monto)+(mora>0?`\n+${fmt(mora)} mora`:''),
+        c.estado==='pagada'?'Pagado':c.estado==='mora'?'En mora':'Pendiente'];
+    }),
+    styles:{fontSize:8.5,cellPadding:3},
+    headStyles:{fillColor:[30,58,110],textColor:255}
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // Pagos
+  if (pagos.length > 0) {
+    doc.autoTable({
+      startY: y, margin:{left:M,right:M},
+      head:[['Fecha pago','Monto','Medio','Registrado por','Observaciones']],
+      body: pagos.map(p => [fmtDate(p.fecha_pago), fmt(p.monto), p.medio||'-', p.registrado_por||'-', p.observaciones||'-']),
+      styles:{fontSize:8.5,cellPadding:3},
+      headStyles:{fillColor:[201,168,76],textColor:[30,58,110]},
+      alternateRowStyles:{fillColor:[253,248,235]}
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  // Docs firmados
+  if (y > 270) { doc.addPage(); y = 20; }
+  doc.setFontSize(9); doc.setTextColor(60,60,60);
+  doc.text(`${exp.firma_pagare?'☑':'☐'} Firma de pagaré   ${exp.firma_convenio?'☑':'☐'} Firma de convenio`, M, y); y += 6;
+  doc.setFontSize(7.5); doc.setTextColor(130,130,130);
+  doc.text(`Generado por: ${currentUserProfile.nombre} · ${new Date().toLocaleString('es-AR')}`, M, y);
+
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(30,58,110); doc.rect(0,287,W,10,'F');
+    doc.setFontSize(7); doc.setTextColor(200,215,240);
+    doc.text(`${STUDY_INFO.nombre}  ·  ${STUDY_INFO.tel}  ·  ${STUDY_INFO.web}`, W/2, 293, {align:'center'});
+  }
+  doc.save(`${exp.numero_exp}_${exp.nombre_cliente.replace(/\s/g,'_')}_reporte.pdf`);
+  hideLoading(); toast('Reporte descargado');
+}
+
+async function descargarExcel(expId) {
+  showLoading();
+  const [expRes, cuotasRes, pagosRes] = await Promise.all([
+    supabase.from('expedientes').select('*').eq('id', expId).single(),
+    supabase.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
+    supabase.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
+  ]);
+  const exp = expRes.data; const cuotas = cuotasRes.data||[]; const pagos = pagosRes.data||[];
+  const wb = XLSX.utils.book_new();
+
+  const datosCliente = [
+    ['GRUPO RA — ESTUDIO DE COBRANZAS','','',''],
+    ['Plan de Pagos','','',''],
+    ['','','',''],
+    ['N° Expediente:', exp.numero_exp,'Fecha:', new Date().toLocaleDateString('es-AR')],
+    ['Cliente:', exp.nombre_cliente,'DNI/CUIL:', exp.dni||'-'],
+    ['Entidad acreedora:', exp.entidad_acreedora,'Plan:', exp.plan_descripcion],
+    ['Teléfono:', exp.telefono1||'-','Email:', exp.email||'-'],
+    ['','','',''],
+    ['RESUMEN FINANCIERO','','',''],
+    ['Deuda original:', exp.deuda_original,'',''],
+    ...(exp.gastos_admin>0?[['Gastos administrativos:', exp.gastos_admin,'','']]:[]),
+    ...(exp.gestion_cobranza>0?[['Gestión de cobranza:', exp.gestion_cobranza,'','']]:[]),
+    ...(exp.honorarios>0?[['Honorarios profesionales:', exp.honorarios,'','']]:[]),
+    ...(exp.otro_concepto_monto>0?[[exp.otro_concepto_nombre||'Otro:', exp.otro_concepto_monto,'','']]:[]),
+    ['Total a regularizar:', exp.deuda_total,'',''],
+    ['Total convenio:', exp.plan_total,'',''],
+    ['','','',''],
+    ['DETALLE DE CUOTAS','','','','',''],
+    ['N°', 'Vencimiento', 'Monto', 'Mora acum.', 'Estado', 'Fecha pago', 'Medio pago'],
+    ...cuotas.map(c => {
+      const mora = calcMoraAcumulada(c);
+      const p = pagos.find(pg => pg.cuota_id === c.id);
+      return [`${c.numero}/${cuotas.length}`, c.fecha_vencimiento, c.monto, mora>0?parseFloat(mora.toFixed(2)):0,
+        c.estado==='pagada'?'Pagado':c.estado==='mora'?'En mora':'Pendiente',
+        p?p.fecha_pago:'-', p?p.medio:'-'];
+    }),
+    ['','','',''],
+    ['Firma pagaré:', exp.firma_pagare?'Sí':'No', 'Firma convenio:', exp.firma_convenio?'Sí':'No'],
+    ['Registrado por:', exp.registrado_por||'-','','']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(datosCliente);
+  ws['!cols'] = [{wch:30},{wch:20},{wch:20},{wch:20},{wch:15},{wch:15},{wch:15}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Plan de Pagos');
+  if (pagos.length > 0) {
+    const wsPagos = XLSX.utils.aoa_to_sheet([
+      ['HISTORIAL DE PAGOS — ' + exp.nombre_cliente],[''],
+      ['Fecha','Monto','Medio','Registrado por','Observaciones'],
+      ...pagos.map(p => [p.fecha_pago, p.monto, p.medio||'-', p.registrado_por||'-', p.observaciones||'-'])
+    ]);
+    XLSX.utils.book_append_sheet(wb, wsPagos, 'Historial Pagos');
+  }
+  XLSX.writeFile(wb, `${exp.numero_exp}_${exp.nombre_cliente.replace(/\s/g,'_')}.xlsx`);
+  hideLoading(); toast('Excel descargado');
+}
+
+init();
+</script>
+</body>
+</html>
