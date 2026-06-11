@@ -323,13 +323,24 @@ tbody tr:hover td{background:#f9fafb}
     <div class="modal-body">
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Cuota</label>
-        <select class="form-select" id="pago-cuota-sel"></select>
+        <select class="form-select" id="pago-cuota-sel" onchange="onCuotaSelChange()"></select>
       </div>
+      <div style="background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:none" id="mora-info-box">
+        <div style="font-size:12px;color:var(--danger);font-weight:600" id="mora-info-text"></div>
+      </div>
+      <label class="check-row" style="margin-bottom:12px;font-weight:500">
+        <input type="checkbox" id="pago-parcial" onchange="onParcialChange()">&nbsp; Pago parcial (abono a cuenta)
+      </label>
       <div class="form-grid" style="margin-bottom:12px">
         <div class="form-group"><label class="form-label">Fecha de pago</label><input type="date" class="form-input" id="pago-fecha"></div>
-        <div class="form-group"><label class="form-label">Monto recibido ($)</label><input type="number" class="form-input" id="pago-monto" placeholder="0.00"></div>
+        <div class="form-group"><label class="form-label">Monto recibido ($)</label><input type="number" class="form-input" id="pago-monto" placeholder="0.00" oninput="calcSaldoParcial()"></div>
       </div>
-      <div class="form-group">
+      <div id="saldo-parcial-box" style="display:none;background:var(--navy-light);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:13px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Monto total de la cuota:</span><span id="sp-total" style="font-weight:600"></span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--text-muted)">Monto ingresado:</span><span id="sp-ingresado" style="font-weight:600;color:var(--navy)"></span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;border-top:1px solid var(--border);padding-top:6px"><span style="font-weight:600">Saldo restante de cuota:</span><span id="sp-saldo" style="font-weight:700;color:var(--danger)"></span></div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Medio de pago</label>
         <select class="form-select" id="pago-medio">
           <option>Transferencia bancaria</option>
@@ -340,7 +351,7 @@ tbody tr:hover td{background:#f9fafb}
           <option>Otro</option>
         </select>
       </div>
-      <div class="form-group" style="margin-top:12px">
+      <div class="form-group">
         <label class="form-label">Observaciones (opcional)</label>
         <input type="text" class="form-input" id="pago-obs" placeholder="Ej: Comprobante #123">
       </div>
@@ -348,6 +359,23 @@ tbody tr:hover td{background:#f9fafb}
     <div class="modal-footer">
       <button class="btn" onclick="closePagoModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="confirmarPago()">Confirmar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR EXPEDIENTE -->
+<div class="modal-overlay" id="modal-editar" style="display:none" onclick="if(event.target===this)cerrarEditarModal()">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <div class="modal-title">Editar expediente</div>
+      <button class="modal-close" onclick="cerrarEditarModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-editar-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="eliminarExpediente()">🗑 Eliminar expediente</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="cerrarEditarModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicion()">💾 Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -608,7 +636,7 @@ function filtrarClientes() {
     filtered.map(e => {
       const badge = e.estado === 'activo' ? 'badge-success' : e.estado === 'mora' ? 'badge-danger' : e.estado === 'cancelado' ? 'badge-gray' : 'badge-warning';
       const label = e.estado === 'activo' ? 'Al día' : e.estado === 'mora' ? 'En mora' : e.estado === 'cancelado' ? 'Cancelado' : 'Prejudicial';
-      return `<tr><td style="color:var(--text-muted);font-size:11px">${e.numero_exp||'-'}</td><td><strong>${e.nombre_cliente}</strong><br><span style="font-size:11px;color:var(--text-muted)">${e.email||''}</span></td><td>${e.dni||'-'}</td><td>${e.entidad_acreedora||'-'}</td><td>${fmt(e.deuda_total)}</td><td>${e.plan_descripcion||'-'}</td><td><span class="badge ${badge}">${label}</span></td><td><button class="btn btn-sm" onclick="abrirExpediente('${e.id}')">Ver</button></td></tr>`;
+      return `<tr><td style="color:var(--text-muted);font-size:11px">${e.numero_exp||'-'}</td><td><strong>${e.nombre_cliente}</strong><br><span style="font-size:11px;color:var(--text-muted)">${e.email||''}</span></td><td>${e.dni||'-'}</td><td>${e.entidad_acreedora||'-'}</td><td>${fmt(e.deuda_total)}</td><td>${e.plan_descripcion||'-'}</td><td><span class="badge ${badge}">${label}</span></td><td style="display:flex;gap:4px"><button class="btn btn-sm" onclick="abrirExpediente('${e.id}')">Ver</button><button class="btn btn-sm" onclick="abrirEditarExpediente('${e.id}')">✏️</button><button class="btn btn-sm btn-danger" onclick="eliminarDirecto('${e.id}')">🗑</button></td></tr>`;
     }).join('');
 }
 
@@ -835,7 +863,7 @@ async function renderExpediente() {
   }).join('');
 
   const pagosHtml = pagos.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Sin pagos registrados</td></tr>' :
-    pagos.map(p => `<tr><td>${fmtDate(p.fecha_pago)}</td><td>${fmt(p.monto)}</td><td>${p.medio||'-'}</td><td>${p.observaciones||'-'}</td><td style="font-size:11px;color:var(--text-muted)">${p.registrado_por||'-'}</td></tr>`).join('');
+    pagos.map(p => `<tr><td>${fmtDate(p.fecha_pago)}</td><td>${fmt(p.monto)}</td><td>${p.es_parcial?'<span class="badge badge-warning">Parcial</span>':'<span class="badge badge-success">Total</span>'}</td><td>${p.medio||'-'}</td><td>${p.observaciones||'-'}</td><td style="font-size:11px;color:var(--text-muted)">${p.registrado_por||'-'}</td></tr>`).join('');
 
   const moraAlerts = cuotas.filter(c => c.estado === 'mora').map(c => {
     const dias = Math.floor((new Date() - new Date(c.fecha_vencimiento+'T12:00:00')) / 86400000);
@@ -843,13 +871,41 @@ async function renderExpediente() {
     return `<div class="alert alert-danger">⚠ Cuota ${c.numero}/${cuotas.length} vencida el ${fmtDate(c.fecha_vencimiento)} — <strong>${dias} día${dias!==1?'s':''} de mora</strong> · Mora acumulada: <strong>${fmt(mora)}</strong> (${exp.mora_diaria||0.5}%/día)</div>`;
   }).join('');
 
+  const cuotasEnMora = cuotas.filter(c => c.estado === 'mora' || (c.estado === 'pendiente' && c.fecha_vencimiento < new Date().toISOString().split('T')[0]));
+  const tieneContador = cuotasEnMora.length > 0;
+  const moraTotalActual = cuotasEnMora.reduce((a,c) => a + calcMoraAcumulada(c), 0);
+  const saldoConMoraActual = saldoPendiente;
+
   content.innerHTML = `
-    <div class="exp-header">
+    <div class="exp-header" style="${tieneContador ? 'grid-template-columns:1fr 1fr 1fr 1fr 1fr' : ''}">
       <div class="exp-header-item"><div class="label">Expediente</div><div class="value">${exp.numero_exp}</div></div>
       <div class="exp-header-item"><div class="label">Cliente</div><div class="value">${exp.nombre_cliente}</div><div style="font-size:11px;opacity:0.6">${exp.entidad_acreedora}</div></div>
       <div class="exp-header-item"><div class="label">Saldo pendiente</div><div class="value big">${fmt(saldoPendiente)}</div><div style="font-size:11px;opacity:0.6">${pagadas}/${cuotas.length} cuotas pagas</div></div>
+      ${tieneContador ? `<div class="exp-header-item" style="background:rgba(153,27,27,0.3);border-radius:8px;padding:8px">
+        <div class="label" style="color:#fca5a5">⚠ Mora punitorias</div>
+        <div class="value" style="color:#fca5a5;font-size:18px" id="mora-counter">${fmt(moraTotalActual)}</div>
+        <div style="font-size:10px;color:#fca5a5;opacity:0.8">${exp.mora_diaria||0.5}%/día · ${cuotasEnMora.length} cuota${cuotasEnMora.length>1?'s':''}</div>
+      </div>
+      <div class="exp-header-item" style="background:rgba(153,27,27,0.2);border-radius:8px;padding:8px">
+        <div class="label" style="color:#fca5a5">Total adeudado c/mora</div>
+        <div class="value big" style="color:#ff6b6b" id="total-mora-counter">${fmt(saldoConMoraActual)}</div>
+        <div style="font-size:10px;color:#fca5a5;opacity:0.8">Actualizado en tiempo real</div>
+      </div>` : ''}
       <div class="exp-header-item"><div class="label">Registrado por</div><div class="value" style="font-size:12px">${exp.registrado_por||'-'}</div><div style="font-size:11px;opacity:0.6">${fmtDate(exp.created_at?.split('T')[0])}</div></div>
-    </div>
+    </div>`;
+
+  // Contador en tiempo real si hay mora
+  if (tieneContador) {
+    window._moraInterval && clearInterval(window._moraInterval);
+    window._moraInterval = setInterval(() => {
+      const moraActual = cuotasEnMora.reduce((a,c) => a + calcMoraAcumulada(c), 0);
+      const el = document.getElementById('mora-counter');
+      const el2 = document.getElementById('total-mora-counter');
+      if (el) el.textContent = fmt(moraActual);
+      if (el2) el2.textContent = fmt(parseFloat(exp.plan_total||0) - totalPagado + moraActual);
+    }, 10000);
+  } else { window._moraInterval && clearInterval(window._moraInterval); }
+
     ${moraAlerts}
     <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px">
       <div class="card">
@@ -898,7 +954,8 @@ async function renderExpediente() {
             ${exp.observaciones ? `<div class="mini-stat"><span class="mini-label">Notas</span><span>${exp.observaciones}</span></div>` : ''}
             <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-sm btn-primary" onclick="descargarReporteCliente('${exp.id}')">📄 Reporte completo</button>
-              <button class="btn btn-sm" onclick="editarEstado('${exp.id}','${exp.estado}')">Cambiar estado</button>
+              <button class="btn btn-sm" onclick="abrirEditarExpediente('${exp.id}')">✏️ Editar</button>
+              <button class="btn btn-sm btn-danger" onclick="eliminarDirecto('${exp.id}')">🗑 Eliminar</button>
             </div>
           </div>
         </div>
@@ -906,43 +963,81 @@ async function renderExpediente() {
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">Historial de pagos</div></div>
-      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Medio</th><th>Observaciones</th><th>Registrado por</th></tr></thead><tbody>${pagosHtml}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Tipo</th><th>Medio</th><th>Observaciones</th><th>Registrado por</th></tr></thead><tbody>${pagosHtml}</tbody></table></div>
     </div>`;
 }
 
 // ========== MODAL PAGO ==========
 let _pagoData = {};
 function abrirPago(cuotaId, num, monto, mora) {
-  _pagoData = { cuotaId, num, monto, mora };
+  _pagoData = { cuotaId, num, monto, mora, montoCuotaConMora: monto + mora };
   const sel = document.getElementById('pago-cuota-sel');
-  sel.innerHTML = `<option value="${cuotaId}">Cuota ${num} — ${fmt(monto)}${mora > 0 ? ` + ${fmt(mora)} mora = ${fmt(monto+mora)}` : ''}</option>`;
+  sel.innerHTML = `<option value="${cuotaId}">Cuota ${num} — ${fmt(monto)}${mora > 0 ? ` + ${fmt(mora)} mora` : ''}</option>`;
   document.getElementById('pago-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('pago-monto').value = (monto + mora).toFixed(2);
   document.getElementById('pago-obs').value = '';
+  document.getElementById('pago-parcial').checked = false;
+  document.getElementById('saldo-parcial-box').style.display = 'none';
+  const moraBox = document.getElementById('mora-info-box');
+  const moraText = document.getElementById('mora-info-text');
+  if (mora > 0) {
+    moraBox.style.display = 'block';
+    moraText.textContent = `⚠ Mora acumulada: ${fmt(mora)} — Total con mora: ${fmt(monto + mora)}`;
+  } else { moraBox.style.display = 'none'; }
   document.getElementById('modal-pago').style.display = 'flex';
 }
 function closePagoModal() { document.getElementById('modal-pago').style.display = 'none'; }
+
+function onCuotaSelChange() { calcSaldoParcial(); }
+
+function onParcialChange() {
+  const parcial = document.getElementById('pago-parcial').checked;
+  document.getElementById('saldo-parcial-box').style.display = parcial ? 'block' : 'none';
+  if (!parcial) document.getElementById('pago-monto').value = _pagoData.montoCuotaConMora.toFixed(2);
+  calcSaldoParcial();
+}
+
+function calcSaldoParcial() {
+  const parcial = document.getElementById('pago-parcial').checked;
+  if (!parcial) return;
+  const ingresado = parseFloat(document.getElementById('pago-monto').value) || 0;
+  const total = _pagoData.montoCuotaConMora;
+  const saldo = Math.max(0, total - ingresado);
+  document.getElementById('sp-total').textContent = fmt(total);
+  document.getElementById('sp-ingresado').textContent = fmt(ingresado);
+  document.getElementById('sp-saldo').textContent = fmt(saldo);
+}
 
 async function confirmarPago() {
   const fecha = document.getElementById('pago-fecha').value;
   const monto = parseFloat(document.getElementById('pago-monto').value);
   const medio = document.getElementById('pago-medio').value;
   const obs = document.getElementById('pago-obs').value;
+  const parcial = document.getElementById('pago-parcial').checked;
   if (!fecha || !monto) { toast('Completá fecha y monto','error'); return; }
   showLoading();
+
+  const saldoCuota = _pagoData.montoCuotaConMora - monto;
+  const esPagadaTotal = !parcial || saldoCuota <= 0;
+  const obsFinal = obs + (parcial && saldoCuota > 0 ? ` [PAGO PARCIAL — saldo restante cuota: ${fmt(saldoCuota)}]` : '');
+
   const { error } = await sbClient.from('pagos').insert({
     expediente_id: currentExpediente, cuota_id: _pagoData.cuotaId,
-    fecha_pago: fecha, monto, medio, observaciones: obs,
+    fecha_pago: fecha, monto, medio, observaciones: obsFinal, es_parcial: parcial && saldoCuota > 0,
     registrado_por: currentUserProfile.nombre, registrado_por_id: currentUser.id
   });
   if (!error) {
-    await sbClient.from('cuotas').update({ estado: 'pagada' }).eq('id', _pagoData.cuotaId);
-    // Check if all paid
+    if (esPagadaTotal) {
+      await sbClient.from('cuotas').update({ estado: 'pagada' }).eq('id', _pagoData.cuotaId);
+    } else {
+      // Cuota parcial: actualizar monto restante en la cuota
+      await sbClient.from('cuotas').update({ monto: parseFloat(saldoCuota.toFixed(2)), estado: 'pendiente' }).eq('id', _pagoData.cuotaId);
+    }
     const { data: pendientes } = await sbClient.from('cuotas').select('id').eq('expediente_id', currentExpediente).neq('estado','pagada');
     if (pendientes && pendientes.length === 0) await sbClient.from('expedientes').update({ estado: 'cancelado' }).eq('id', currentExpediente);
     else await sbClient.from('expedientes').update({ estado: 'activo' }).eq('id', currentExpediente);
     closePagoModal();
-    toast('Pago registrado correctamente');
+    toast(esPagadaTotal ? 'Pago registrado — cuota cancelada' : `Pago parcial registrado — saldo pendiente: ${fmt(saldoCuota)}`);
     await renderExpediente();
   } else { toast('Error al registrar pago','error'); }
   hideLoading();
@@ -957,6 +1052,92 @@ async function editarEstado(id, estadoActual) {
   await sbClient.from('expedientes').update({ estado: nuevo.toLowerCase().trim() }).eq('id', id);
   toast('Estado actualizado');
   await renderExpediente();
+}
+
+async function eliminarDirecto(id) {
+  if (!confirm('¿Eliminar este expediente y todos sus datos? No se puede deshacer.')) return;
+  showLoading();
+  await sbClient.from('pagos').delete().eq('expediente_id', id);
+  await sbClient.from('cuotas').delete().eq('expediente_id', id);
+  await sbClient.from('expedientes').delete().eq('id', id);
+  hideLoading();
+  toast('Expediente eliminado');
+  if (currentExpediente === id) { currentExpediente = null; document.getElementById('nav-expediente').style.display = 'none'; }
+  navigate('clientes');
+}
+
+// ========== EDITAR EXPEDIENTE ==========
+async function abrirEditarExpediente(id) {
+  const { data: exp } = await sbClient.from('expedientes').select('*').eq('id', id).single();
+  if (!exp) return;
+  document.getElementById('modal-editar-body').innerHTML = `
+    <div class="section-divider" style="margin-top:0">Datos del cliente</div>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group"><label class="form-label">Apellido y nombre</label><input type="text" class="form-input" id="e-nombre" value="${exp.nombre_cliente||''}"></div>
+      <div class="form-group"><label class="form-label">DNI / CUIL</label><input type="text" class="form-input" id="e-dni" value="${exp.dni||''}"></div>
+      <div class="form-group"><label class="form-label">Teléfono principal</label><input type="text" class="form-input" id="e-tel1" value="${exp.telefono1||''}"></div>
+      <div class="form-group"><label class="form-label">Teléfono alternativo</label><input type="text" class="form-input" id="e-tel2" value="${exp.telefono2||''}"></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="e-email" value="${exp.email||''}"></div>
+      <div class="form-group"><label class="form-label">Domicilio</label><input type="text" class="form-input" id="e-domicilio" value="${exp.domicilio||''}"></div>
+    </div>
+    <div class="section-divider">Deuda y documentación</div>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group"><label class="form-label">Entidad acreedora</label><input type="text" class="form-input" id="e-entidad" value="${exp.entidad_acreedora||''}"></div>
+      <div class="form-group"><label class="form-label">Estado</label>
+        <select class="form-select" id="e-estado">
+          <option value="activo" ${exp.estado==='activo'?'selected':''}>Activo</option>
+          <option value="mora" ${exp.estado==='mora'?'selected':''}>En mora</option>
+          <option value="cancelado" ${exp.estado==='cancelado'?'selected':''}>Cancelado</option>
+          <option value="prejudicial" ${exp.estado==='prejudicial'?'selected':''}>Prejudicial</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <label class="check-row"><input type="checkbox" id="e-pagare" ${exp.firma_pagare?'checked':''}>&nbsp; Firma de pagaré</label>
+      <label class="check-row"><input type="checkbox" id="e-convenio" ${exp.firma_convenio?'checked':''}>&nbsp; Firma de convenio</label>
+    </div>
+    <div class="form-group"><label class="form-label">Observaciones</label><input type="text" class="form-input" id="e-obs" value="${exp.observaciones||''}"></div>
+    <input type="hidden" id="e-id" value="${exp.id}">`;
+  document.getElementById('modal-editar').style.display = 'flex';
+}
+function cerrarEditarModal() { document.getElementById('modal-editar').style.display = 'none'; }
+
+async function guardarEdicion() {
+  const id = document.getElementById('e-id').value;
+  showLoading();
+  await sbClient.from('expedientes').update({
+    nombre_cliente: document.getElementById('e-nombre').value,
+    dni: document.getElementById('e-dni').value,
+    telefono1: document.getElementById('e-tel1').value,
+    telefono2: document.getElementById('e-tel2').value,
+    email: document.getElementById('e-email').value,
+    domicilio: document.getElementById('e-domicilio').value,
+    entidad_acreedora: document.getElementById('e-entidad').value,
+    estado: document.getElementById('e-estado').value,
+    firma_pagare: document.getElementById('e-pagare').checked,
+    firma_convenio: document.getElementById('e-convenio').checked,
+    observaciones: document.getElementById('e-obs').value
+  }).eq('id', id);
+  hideLoading();
+  cerrarEditarModal();
+  toast('Expediente actualizado');
+  if (currentExpediente === id) await renderExpediente();
+  else navigate('clientes');
+}
+
+async function eliminarExpediente() {
+  const id = document.getElementById('e-id').value;
+  if (!confirm('¿Eliminar este expediente? Se borrarán también todas las cuotas y pagos asociados. Esta acción no se puede deshacer.')) return;
+  showLoading();
+  await sbClient.from('pagos').delete().eq('expediente_id', id);
+  await sbClient.from('cuotas').delete().eq('expediente_id', id);
+  await sbClient.from('expedientes').delete().eq('id', id);
+  hideLoading();
+  cerrarEditarModal();
+  toast('Expediente eliminado');
+  currentExpediente = null;
+  document.getElementById('nav-expediente').style.display = 'none';
+  navigate('clientes');
 }
 
 // ========== CONFIG ==========
