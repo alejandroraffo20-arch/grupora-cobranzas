@@ -974,7 +974,7 @@ let _pagoData = {};
 function abrirPago(cuotaId, num, monto, mora) {
   _pagoData = { cuotaId, num, monto, mora, montoCuotaConMora: monto + mora };
   const sel = document.getElementById('pago-cuota-sel');
-  sel.innerHTML = `<option value="${cuotaId}">Cuota ${num} — ${fmt(monto)}${mora > 0 ? ` + ${fmt(mora)} mora` : ''}</option>`;
+  sel.innerHTML = '<option value="'+cuotaId+'">Cuota '+num+' — '+fmt(monto)+(mora > 0 ? ' + '+fmt(mora)+' mora' : '')+'</option>';
   document.getElementById('pago-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('pago-monto').value = (monto + mora).toFixed(2);
   document.getElementById('pago-obs').value = '';
@@ -984,7 +984,7 @@ function abrirPago(cuotaId, num, monto, mora) {
   const moraText = document.getElementById('mora-info-text');
   if (mora > 0) {
     moraBox.style.display = 'block';
-    moraText.textContent = `⚠ Mora acumulada: ${fmt(mora)} — Total con mora: ${fmt(monto + mora)}`;
+    moraText.textContent = '⚠ Mora acumulada: '+fmt(mora)+' — Total con mora: '+fmt(monto + mora);
   } else { moraBox.style.display = 'none'; }
   document.getElementById('modal-pago').style.display = 'flex';
 }
@@ -1021,7 +1021,7 @@ async function confirmarPago() {
 
   const saldoCuota = _pagoData.montoCuotaConMora - monto;
   const esPagadaTotal = !parcial || saldoCuota <= 0;
-  const obsFinal = obs + (parcial && saldoCuota > 0 ? ` [PAGO PARCIAL — saldo restante cuota: ${fmt(saldoCuota)}]` : '');
+  const obsFinal = obs + (parcial && saldoCuota > 0 ? ' [PAGO PARCIAL — saldo restante: '+fmt(saldoCuota)+']' : '');
 
   const { error } = await sbClient.from('pagos').insert({
     expediente_id: currentExpediente, cuota_id: _pagoData.cuotaId,
@@ -1039,7 +1039,7 @@ async function confirmarPago() {
     if (pendientes && pendientes.length === 0) await sbClient.from('expedientes').update({ estado: 'cancelado' }).eq('id', currentExpediente);
     else await sbClient.from('expedientes').update({ estado: 'activo' }).eq('id', currentExpediente);
     closePagoModal();
-    toast(esPagadaTotal ? 'Pago registrado — cuota cancelada' : `Pago parcial registrado — saldo pendiente: ${fmt(saldoCuota)}`);
+    toast(esPagadaTotal ? 'Pago registrado — cuota cancelada' : 'Pago parcial — saldo pendiente: '+fmt(saldoCuota));
     await renderExpediente();
   } else { toast('Error al registrar pago','error'); }
   hideLoading();
@@ -1275,7 +1275,7 @@ async function descargarPDF(expId) {
     ...(exp.honorarios > 0 ? [['Honorarios profesionales:', fmt(exp.honorarios)]] : []),
     ...(exp.otro_concepto_monto > 0 ? [[exp.otro_concepto_nombre||'Otro:', fmt(exp.otro_concepto_monto)]] : []),
     ['TOTAL A REGULARIZAR:', fmt(exp.deuda_total)],
-    [`TOTAL CONVENIO (${exp.plan_descripcion}):`, fmt(exp.plan_total)]
+    ['TOTAL CONVENIO ('+exp.plan_descripcion+'):', fmt(exp.plan_total)]
   ];
   conceptos.forEach(([l,v], i) => {
     if (i === conceptos.length - 2) { doc.setDrawColor(201,168,76); doc.line(M, y-1, W-M, y-1); doc.setFont('helvetica','bold'); }
@@ -1297,8 +1297,8 @@ async function descargarPDF(expId) {
       const p = pagos.find(pg => pg.cuota_id === c.id);
       const mora = calcMoraAcumulada(c);
       return [
-        `${c.numero}/${cuotas.length}`, fmtDate(c.fecha_vencimiento),
-        fmt(c.monto) + (mora > 0 ? `\n+${fmt(mora)} mora` : ''),
+        (c.numero+'/'+cuotas.length), fmtDate(c.fecha_vencimiento),
+        fmt(c.monto) + (mora > 0 ? '\n+'+fmt(mora)+' mora' : ''),
         c.estado === 'pagada' ? 'Pagado' : c.estado === 'mora' ? 'En mora' : 'Pendiente',
         p ? fmtDate(p.fecha_pago) : '-', p ? p.medio : '-'
       ];
@@ -1398,7 +1398,7 @@ async function descargarReporteCliente(expId) {
       ...(exp.honorarios>0?[['Honorarios profesionales',fmt(exp.honorarios)]]:[]),
       ...(exp.otro_concepto_monto>0?[[exp.otro_concepto_nombre||'Otro',fmt(exp.otro_concepto_monto)]]:[]),
       ['TOTAL A REGULARIZAR', fmt(exp.deuda_total)],
-      [`TOTAL CONVENIO (${exp.plan_descripcion})`, fmt(exp.plan_total)],
+      ['TOTAL CONVENIO ('+exp.plan_descripcion+')', fmt(exp.plan_total)],
       ['Total pagado', fmt(totalPagado)],
       ...(moraTotal>0?[['Mora acumulada',fmt(moraTotal)]]:[]),
       ['SALDO PENDIENTE', fmt(parseFloat(exp.plan_total)-totalPagado+moraTotal)]
@@ -1415,7 +1415,7 @@ async function descargarReporteCliente(expId) {
     head:[['N°','Vencimiento','Monto','Estado']],
     body: cuotas.map(c => {
       const mora = calcMoraAcumulada(c);
-      return [`${c.numero}/${cuotas.length}`, fmtDate(c.fecha_vencimiento), fmt(c.monto)+(mora>0?`\n+${fmt(mora)} mora`:''),
+      return [(c.numero+'/'+cuotas.length), fmtDate(c.fecha_vencimiento), fmt(c.monto)+(mora>0?'\n+'+fmt(mora)+' mora':''),
         c.estado==='pagada'?'Pagado':c.estado==='mora'?'En mora':'Pendiente'];
     }),
     styles:{fontSize:8.5,cellPadding:3},
