@@ -380,6 +380,87 @@ tbody tr:hover td{background:#f9fafb}
   </div>
 </div>
 
+<!-- MODAL EDITAR PAGO -->
+<div class="modal-overlay" id="modal-editar-pago" style="display:none" onclick="if(event.target===this)cerrarEditarPago()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="editar-pago-title">Editar pago</div>
+      <button class="modal-close" onclick="cerrarEditarPago()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ep-id">
+      <input type="hidden" id="ep-tipo">
+      <div id="ep-cuota-row" class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Cuota asociada</label>
+        <select class="form-select" id="ep-cuota-sel"></select>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Fecha de pago</label><input type="date" class="form-input" id="ep-fecha"></div>
+        <div class="form-group"><label class="form-label">Monto ($)</label><input type="number" class="form-input" id="ep-monto" placeholder="0.00"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Medio de pago</label>
+        <select class="form-select" id="ep-medio">
+          <option>Transferencia bancaria</option><option>Efectivo</option>
+          <option>Depósito bancario</option><option>Cheque</option>
+          <option>MercadoPago</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observaciones</label>
+        <input type="text" class="form-input" id="ep-obs" placeholder="Ej: Comprobante #123">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="eliminarPago()">🗑 Eliminar pago</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="cerrarEditarPago()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionPago()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PAGO LIBRE -->
+<div class="modal-overlay" id="modal-pago-libre" style="display:none" onclick="if(event.target===this)cerrarPagoLibre()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Registrar abono / pago libre</div>
+      <button class="modal-close" onclick="cerrarPagoLibre()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-info" style="margin-bottom:12px">Este pago no está asociado a ninguna cuota. Se registra como abono al saldo pendiente del expediente.</div>
+      <div id="pl-saldo-box" style="background:var(--navy-light);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;color:var(--text-muted)">Saldo pendiente actual</span>
+        <span style="font-weight:700;font-size:16px;color:var(--navy)" id="pl-saldo-val">$0,00</span>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label class="form-label">Fecha de pago</label><input type="date" class="form-input" id="pl-fecha"></div>
+        <div class="form-group"><label class="form-label">Monto ($)</label><input type="number" class="form-input" id="pl-monto" placeholder="0.00" oninput="calcSaldoLibre()"></div>
+      </div>
+      <div id="pl-nuevo-saldo" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;color:#166534">Saldo restante tras este pago</span>
+        <span style="font-weight:700;color:#166534" id="pl-saldo-nuevo">$0,00</span>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Concepto / motivo</label>
+        <input type="text" class="form-input" id="pl-concepto" placeholder="Ej: Saldo pendiente plan vencido, abono extra, etc.">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Medio de pago</label>
+        <select class="form-select" id="pl-medio">
+          <option>Transferencia bancaria</option><option>Efectivo</option>
+          <option>Depósito bancario</option><option>Cheque</option>
+          <option>MercadoPago</option><option>Otro</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarPagoLibre()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarPagoLibre()">💾 Registrar abono</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="toast"></div>
 
@@ -863,7 +944,7 @@ async function renderExpediente() {
   }).join('');
 
   const pagosHtml = pagos.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Sin pagos registrados</td></tr>' :
-    pagos.map(p => `<tr><td>${fmtDate(p.fecha_pago)}</td><td>${fmt(p.monto)}</td><td>${p.es_parcial?'<span class="badge badge-warning">Parcial</span>':'<span class="badge badge-success">Total</span>'}</td><td>${p.medio||'-'}</td><td>${p.observaciones||'-'}</td><td style="font-size:11px;color:var(--text-muted)">${p.registrado_por||'-'}</td></tr>`).join('');
+    pagos.map(p => '<tr><td>'+fmtDate(p.fecha_pago)+'</td><td>'+fmt(p.monto)+'</td><td>'+(p.es_parcial?'<span class="badge badge-warning">Parcial</span>':'<span class="badge badge-success">Total</span>')+'</td><td>'+(p.medio||'-')+'</td><td>'+(p.observaciones||'-')+'</td><td style="font-size:11px;color:var(--text-muted)">'+(p.registrado_por||'-')+'</td><td><button class="btn btn-sm" onclick="abrirEditarPago(\''+p.id+'\',\''+( p.cuota_id||'')+'\')">✏️</button></td></tr>').join('');
 
   const moraAlerts = cuotas.filter(c => c.estado === 'mora').map(c => {
     const dias = Math.floor((new Date() - new Date(c.fecha_vencimiento+'T12:00:00')) / 86400000);
@@ -964,8 +1045,8 @@ async function renderExpediente() {
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">Historial de pagos</div></div>
-      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Tipo</th><th>Medio</th><th>Observaciones</th><th>Registrado por</th></tr></thead><tbody>${pagosHtml}</tbody></table></div>
+      <div class="card-header"><div class="card-title">Historial de pagos</div><button class="btn btn-primary btn-sm" onclick="abrirPagoLibre()">+ Registrar abono</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Tipo</th><th>Medio</th><th>Observaciones</th><th>Registrado por</th><th></th></tr></thead><tbody>${pagosHtml}</tbody></table></div>
     </div>`;
 }
 
@@ -1043,6 +1124,113 @@ async function confirmarPago() {
     await renderExpediente();
   } else { toast('Error al registrar pago','error'); }
   hideLoading();
+}
+
+// ========== EDITAR PAGO ==========
+let _cuotasExp = [];
+async function abrirEditarPago(pagoId, cuotaId) {
+  const { data: pago } = await sbClient.from('pagos').select('*').eq('id', pagoId).single();
+  if (!pago) return;
+  const { data: cuotas } = await sbClient.from('cuotas').select('*').eq('expediente_id', currentExpediente).order('numero');
+  _cuotasExp = cuotas || [];
+  document.getElementById('ep-id').value = pagoId;
+  document.getElementById('ep-tipo').value = 'editar';
+  document.getElementById('editar-pago-title').textContent = 'Editar pago';
+  document.getElementById('ep-fecha').value = pago.fecha_pago;
+  document.getElementById('ep-monto').value = pago.monto;
+  document.getElementById('ep-obs').value = pago.observaciones || '';
+  const medioSel = document.getElementById('ep-medio');
+  for (let o of medioSel.options) { if (o.value === pago.medio) { o.selected = true; break; } }
+  const cuotaSel = document.getElementById('ep-cuota-sel');
+  cuotaSel.innerHTML = '<option value="">— Sin cuota asociada (pago libre) —</option>'
+    + _cuotasExp.map(c => '<option value="'+c.id+'"'+(c.id===cuotaId?' selected':'')+'>Cuota '+c.numero+' — '+fmt(c.monto)+'</option>').join('');
+  document.getElementById('modal-editar-pago').style.display = 'flex';
+}
+function cerrarEditarPago() { document.getElementById('modal-editar-pago').style.display = 'none'; }
+
+async function guardarEdicionPago() {
+  const id = document.getElementById('ep-id').value;
+  const fecha = document.getElementById('ep-fecha').value;
+  const monto = parseFloat(document.getElementById('ep-monto').value);
+  const medio = document.getElementById('ep-medio').value;
+  const obs = document.getElementById('ep-obs').value;
+  const cuotaId = document.getElementById('ep-cuota-sel').value || null;
+  if (!fecha || !monto) { toast('Completá fecha y monto', 'error'); return; }
+  showLoading();
+  await sbClient.from('pagos').update({ fecha_pago: fecha, monto, medio, observaciones: obs, cuota_id: cuotaId }).eq('id', id);
+  hideLoading();
+  cerrarEditarPago();
+  toast('Pago actualizado');
+  await renderExpediente();
+}
+
+async function eliminarPago() {
+  const id = document.getElementById('ep-id').value;
+  if (!confirm('¿Eliminar este pago? El saldo del expediente se recalculará.')) return;
+  showLoading();
+  // Reabrir cuota si estaba asociada
+  const cuotaId = document.getElementById('ep-cuota-sel').value;
+  if (cuotaId) await sbClient.from('cuotas').update({ estado: 'pendiente' }).eq('id', cuotaId);
+  await sbClient.from('pagos').delete().eq('id', id);
+  // Recalcular estado expediente
+  const { data: pendientes } = await sbClient.from('cuotas').select('id').eq('expediente_id', currentExpediente).neq('estado','pagada');
+  if (pendientes && pendientes.length > 0) await sbClient.from('expedientes').update({ estado: 'activo' }).eq('id', currentExpediente);
+  hideLoading();
+  cerrarEditarPago();
+  toast('Pago eliminado');
+  await renderExpediente();
+}
+
+// ========== PAGO LIBRE ==========
+let _saldoPendienteActual = 0;
+async function abrirPagoLibre() {
+  const { data: pagos } = await sbClient.from('pagos').select('monto').eq('expediente_id', currentExpediente);
+  const { data: exp } = await sbClient.from('expedientes').select('plan_total').eq('id', currentExpediente).single();
+  const { data: cuotas } = await sbClient.from('cuotas').select('*').eq('expediente_id', currentExpediente);
+  const totalPagado = (pagos||[]).reduce((a,p) => a + parseFloat(p.monto||0), 0);
+  const moraTotal = (cuotas||[]).filter(c => c.estado !== 'pagada').reduce((a,c) => a + calcMoraAcumulada(c), 0);
+  _saldoPendienteActual = parseFloat((exp?.plan_total||0)) - totalPagado + moraTotal;
+  document.getElementById('pl-saldo-val').textContent = fmt(_saldoPendienteActual);
+  document.getElementById('pl-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pl-monto').value = '';
+  document.getElementById('pl-concepto').value = '';
+  document.getElementById('pl-nuevo-saldo').style.display = 'none';
+  document.getElementById('modal-pago-libre').style.display = 'flex';
+}
+function cerrarPagoLibre() { document.getElementById('modal-pago-libre').style.display = 'none'; }
+
+function calcSaldoLibre() {
+  const monto = parseFloat(document.getElementById('pl-monto').value) || 0;
+  const nuevo = _saldoPendienteActual - monto;
+  const box = document.getElementById('pl-nuevo-saldo');
+  if (monto > 0) {
+    box.style.display = 'flex';
+    document.getElementById('pl-saldo-nuevo').textContent = fmt(Math.max(0, nuevo));
+    box.style.background = nuevo <= 0 ? '#f0fdf4' : '#fffbeb';
+    box.style.borderColor = nuevo <= 0 ? '#86efac' : '#fcd34d';
+    document.getElementById('pl-saldo-nuevo').style.color = nuevo <= 0 ? '#166534' : '#92400e';
+  } else { box.style.display = 'none'; }
+}
+
+async function confirmarPagoLibre() {
+  const fecha = document.getElementById('pl-fecha').value;
+  const monto = parseFloat(document.getElementById('pl-monto').value);
+  const medio = document.getElementById('pl-medio').value;
+  const concepto = document.getElementById('pl-concepto').value || 'Abono / pago libre';
+  if (!fecha || !monto) { toast('Completá fecha y monto', 'error'); return; }
+  showLoading();
+  await sbClient.from('pagos').insert({
+    expediente_id: currentExpediente, cuota_id: null,
+    fecha_pago: fecha, monto, medio, observaciones: concepto,
+    es_parcial: true, registrado_por: currentUserProfile.nombre, registrado_por_id: currentUser.id
+  });
+  // Si el saldo queda en 0 o menos, marcar como cancelado
+  const nuevo = _saldoPendienteActual - monto;
+  if (nuevo <= 0) await sbClient.from('expedientes').update({ estado: 'cancelado' }).eq('id', currentExpediente);
+  hideLoading();
+  cerrarPagoLibre();
+  toast('Abono registrado — saldo actualizado');
+  await renderExpediente();
 }
 
 // ========== ESTADO ==========
