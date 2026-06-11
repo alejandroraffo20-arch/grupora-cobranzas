@@ -365,7 +365,9 @@ const STUDY_INFO = {
   email: 'estudio@grupora.com'
 };
 
-let sbClient = null;
+const SB_URL = 'https://wyyumcwznvydqkipbvxp.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5eXVtY3d6bnZ5ZHFraXBidnhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMDg2NzEsImV4cCI6MjA5NjY4NDY3MX0.-AnynPqbvU4pqIVuyYAKpj_nKRvk-9nVe0NM2z_Z5R8';
+let sbClient = window.supabase.createClient(SB_URL, SB_KEY);
 let currentUser = null;
 let currentUserProfile = null;
 let currentExpediente = null;
@@ -373,32 +375,19 @@ let appConfig = {};
 
 // ========== INIT ==========
 async function init() {
-  const url = localStorage.getItem('sb_url');
-  const key = localStorage.getItem('sb_key');
-  if (!url || !key) {
-    document.getElementById('setup-screen').style.display = 'flex';
-    document.getElementById('login-screen').style.display = 'none';
-    return;
-  }
-  sbClient = window.supabase.createClient(url, key);
-  const { data: { session } } = await sbClient.auth.getSession();
-  if (session) {
-    await loginSuccess(session.user);
-  } else {
+  try {
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (session) {
+      await loginSuccess(session.user);
+    } else {
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  } catch(e) {
     document.getElementById('login-screen').style.display = 'flex';
   }
 }
 
-async function saveSetup() {
-  const url = document.getElementById('setup-url').value.trim();
-  const key = document.getElementById('setup-key').value.trim();
-  if (!url || !key) { document.getElementById('setup-error').textContent = 'Completá ambos campos'; return; }
-  localStorage.setItem('sb_url', url);
-  localStorage.setItem('sb_key', key);
-  document.getElementById('setup-screen').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  sbClient = window.supabase.createClient(url, key);
-}
+async function saveSetup() {}
 
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
