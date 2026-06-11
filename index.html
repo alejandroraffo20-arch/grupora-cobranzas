@@ -365,7 +365,7 @@ const STUDY_INFO = {
   email: 'estudio@grupora.com'
 };
 
-let supabase = null;
+let sbClient = null;
 let currentUser = null;
 let currentUserProfile = null;
 let currentExpediente = null;
@@ -380,8 +380,8 @@ async function init() {
     document.getElementById('login-screen').style.display = 'none';
     return;
   }
-  supabase = window.supabase.createClient(url, key);
-  const { data: { session } } = await supabase.auth.getSession();
+  sbClient = window.supabase.createClient(url, key);
+  const { data: { session } } = await sbClient.auth.getSession();
   if (session) {
     await loginSuccess(session.user);
   } else {
@@ -397,7 +397,7 @@ async function saveSetup() {
   localStorage.setItem('sb_key', key);
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
-  supabase = window.supabase.createClient(url, key);
+  sbClient = window.supabase.createClient(url, key);
 }
 
 async function doLogin() {
@@ -406,7 +406,7 @@ async function doLogin() {
   document.getElementById('login-error').textContent = '';
   if (!email || !pass) { document.getElementById('login-error').textContent = 'Completá email y contraseña'; return; }
   showLoading();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pass });
   hideLoading();
   if (error) { document.getElementById('login-error').textContent = 'Email o contraseña incorrectos'; return; }
   await loginSuccess(data.user);
@@ -414,7 +414,7 @@ async function doLogin() {
 
 async function loginSuccess(user) {
   currentUser = user;
-  const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
+  const { data: profile } = await sbClient.from('users').select('*').eq('id', user.id).single();
   currentUserProfile = profile || { nombre: user.email.split('@')[0], rol: 'usuario' };
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -428,7 +428,7 @@ async function loginSuccess(user) {
 }
 
 async function doLogout() {
-  await supabase.auth.signOut();
+  await sbClient.auth.signOut();
   location.reload();
 }
 
@@ -438,7 +438,7 @@ function updateClock() {
 }
 
 async function loadConfig() {
-  const { data } = await supabase.from('config').select('*');
+  const { data } = await sbClient.from('config').select('*');
   if (data) data.forEach(r => appConfig[r.clave] = r.valor);
   if (!appConfig.mora_diaria) appConfig.mora_diaria = '0.5';
   if (!appConfig.quita_contado) appConfig.quita_contado = '20';
@@ -510,10 +510,10 @@ async function renderDashboard() {
   const hoy = new Date().toISOString().split('T')[0];
   const en7 = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
   const [expRes, cuotasMoraRes, cuotasProxRes, pagosMesRes] = await Promise.all([
-    supabase.from('expedientes').select('id,estado,deuda_total').eq('estado','activo'),
-    supabase.from('cuotas').select('*,expedientes(nombre_cliente)').lte('fecha_vencimiento',hoy).eq('estado','pendiente'),
-    supabase.from('cuotas').select('*,expedientes(nombre_cliente,entidad_acreedora)').gte('fecha_vencimiento',hoy).lte('fecha_vencimiento',en7).eq('estado','pendiente').order('fecha_vencimiento'),
-    supabase.from('pagos').select('monto').gte('fecha_pago', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
+    sbClient.from('expedientes').select('id,estado,deuda_total').eq('estado','activo'),
+    sbClient.from('cuotas').select('*,expedientes(nombre_cliente)').lte('fecha_vencimiento',hoy).eq('estado','pendiente'),
+    sbClient.from('cuotas').select('*,expedientes(nombre_cliente,entidad_acreedora)').gte('fecha_vencimiento',hoy).lte('fecha_vencimiento',en7).eq('estado','pendiente').order('fecha_vencimiento'),
+    sbClient.from('pagos').select('monto').gte('fecha_pago', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
   ]);
   const exps = expRes.data || [];
   const cuotasMora = cuotasMoraRes.data || [];
@@ -573,7 +573,7 @@ async function renderDashboard() {
 async function renderClientes() {
   const content = document.getElementById('content');
   content.innerHTML = '<div class="spinner" style="margin:40px auto;width:32px;height:32px;border-width:3px"></div>';
-  const { data } = await supabase.from('expedientes').select('*').order('created_at',{ascending:false});
+  const { data } = await sbClient.from('expedientes').select('*').order('created_at',{ascending:false});
   const exps = data || [];
   const rows = exps.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:40px">Sin expedientes registrados</td></tr>' :
     exps.map(e => {
@@ -750,7 +750,7 @@ async function crearExpediente() {
   const planDesc = planSel === 'contado' ? 'Pago contado' : `${planSel} cuotas`;
 
   // Get next exp number
-  const { count } = await supabase.from('expedientes').select('id', { count: 'exact', head: true });
+  const { count } = await sbClient.from('expedientes').select('id', { count: 'exact', head: true });
   const numExp = 'EXP-' + String((count||0)+1).padStart(3,'0');
 
   const expData = {
@@ -768,7 +768,7 @@ async function crearExpediente() {
     estado: 'activo', registrado_por: currentUserProfile.nombre, registrado_por_id: currentUser.id
   };
 
-  const { data: newExp, error } = await supabase.from('expedientes').insert(expData).select().single();
+  const { data: newExp, error } = await sbClient.from('expedientes').insert(expData).select().single();
   if (error) { hideLoading(); toast('Error al crear expediente: '+error.message,'error'); return; }
 
   // Generar cuotas
@@ -782,7 +782,7 @@ async function crearExpediente() {
       cuotas.push({ expediente_id: newExp.id, numero: i+1, monto: planData.cuotas[i], fecha_vencimiento: fv.toISOString().split('T')[0], estado: 'pendiente', es_mora: false });
     }
   }
-  await supabase.from('cuotas').insert(cuotas);
+  await sbClient.from('cuotas').insert(cuotas);
   hideLoading();
   toast(`Expediente ${numExp} creado correctamente`);
   currentExpediente = newExp.id;
@@ -802,9 +802,9 @@ async function renderExpediente() {
   const content = document.getElementById('content');
   content.innerHTML = '<div class="spinner" style="margin:40px auto;width:32px;height:32px;border-width:3px"></div>';
   const [expRes, cuotasRes, pagosRes] = await Promise.all([
-    supabase.from('expedientes').select('*').eq('id', currentExpediente).single(),
-    supabase.from('cuotas').select('*').eq('expediente_id', currentExpediente).order('numero'),
-    supabase.from('pagos').select('*').eq('expediente_id', currentExpediente).order('created_at')
+    sbClient.from('expedientes').select('*').eq('id', currentExpediente).single(),
+    sbClient.from('cuotas').select('*').eq('expediente_id', currentExpediente).order('numero'),
+    sbClient.from('pagos').select('*').eq('expediente_id', currentExpediente).order('created_at')
   ]);
   const exp = expRes.data;
   const cuotas = cuotasRes.data || [];
@@ -823,9 +823,9 @@ async function renderExpediente() {
   // Actualizar estados de mora
   for (const c of cuotas) {
     if (c.estado === 'pendiente' && c.fecha_vencimiento < hoy) {
-      await supabase.from('cuotas').update({ estado: 'mora' }).eq('id', c.id);
+      await sbClient.from('cuotas').update({ estado: 'mora' }).eq('id', c.id);
       c.estado = 'mora';
-      if (exp.estado === 'activo') await supabase.from('expedientes').update({ estado: 'mora' }).eq('id', exp.id);
+      if (exp.estado === 'activo') await sbClient.from('expedientes').update({ estado: 'mora' }).eq('id', exp.id);
     }
   }
 
@@ -941,17 +941,17 @@ async function confirmarPago() {
   const obs = document.getElementById('pago-obs').value;
   if (!fecha || !monto) { toast('Completá fecha y monto','error'); return; }
   showLoading();
-  const { error } = await supabase.from('pagos').insert({
+  const { error } = await sbClient.from('pagos').insert({
     expediente_id: currentExpediente, cuota_id: _pagoData.cuotaId,
     fecha_pago: fecha, monto, medio, observaciones: obs,
     registrado_por: currentUserProfile.nombre, registrado_por_id: currentUser.id
   });
   if (!error) {
-    await supabase.from('cuotas').update({ estado: 'pagada' }).eq('id', _pagoData.cuotaId);
+    await sbClient.from('cuotas').update({ estado: 'pagada' }).eq('id', _pagoData.cuotaId);
     // Check if all paid
-    const { data: pendientes } = await supabase.from('cuotas').select('id').eq('expediente_id', currentExpediente).neq('estado','pagada');
-    if (pendientes && pendientes.length === 0) await supabase.from('expedientes').update({ estado: 'cancelado' }).eq('id', currentExpediente);
-    else await supabase.from('expedientes').update({ estado: 'activo' }).eq('id', currentExpediente);
+    const { data: pendientes } = await sbClient.from('cuotas').select('id').eq('expediente_id', currentExpediente).neq('estado','pagada');
+    if (pendientes && pendientes.length === 0) await sbClient.from('expedientes').update({ estado: 'cancelado' }).eq('id', currentExpediente);
+    else await sbClient.from('expedientes').update({ estado: 'activo' }).eq('id', currentExpediente);
     closePagoModal();
     toast('Pago registrado correctamente');
     await renderExpediente();
@@ -965,14 +965,14 @@ async function editarEstado(id, estadoActual) {
   if (!nuevo) return;
   const validos = ['activo','mora','cancelado','prejudicial'];
   if (!validos.includes(nuevo.toLowerCase().trim())) { toast('Estado inválido','error'); return; }
-  await supabase.from('expedientes').update({ estado: nuevo.toLowerCase().trim() }).eq('id', id);
+  await sbClient.from('expedientes').update({ estado: nuevo.toLowerCase().trim() }).eq('id', id);
   toast('Estado actualizado');
   await renderExpediente();
 }
 
 // ========== CONFIG ==========
 async function renderConfig() {
-  const { data: users } = await supabase.from('users').select('*');
+  const { data: users } = await sbClient.from('users').select('*');
   document.getElementById('content').innerHTML = `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div class="card">
@@ -1019,7 +1019,7 @@ async function guardarConfig() {
   for (const f of fields) {
     const key = f.dataset.key;
     const val = f.value;
-    await supabase.from('config').upsert({ clave: key, valor: val }, { onConflict: 'clave' });
+    await sbClient.from('config').upsert({ clave: key, valor: val }, { onConflict: 'clave' });
     appConfig[key] = val;
   }
   hideLoading();
@@ -1028,7 +1028,7 @@ async function guardarConfig() {
 
 // ========== USUARIOS ==========
 async function renderUsuarios() {
-  const { data: users } = await supabase.from('users').select('*');
+  const { data: users } = await sbClient.from('users').select('*');
   const rows = (users||[]).map(u => `<tr><td>${u.nombre}</td><td>${u.email||'-'}</td><td><span class="badge ${u.rol==='admin'?'badge-warning':'badge-info'}">${u.rol}</span></td><td>${fmtDate(u.created_at?.split('T')[0])}</td></tr>`).join('');
   document.getElementById('content').innerHTML = `
   <div class="card">
@@ -1051,9 +1051,9 @@ function invitarUsuario() {
 async function descargarPDF(expId) {
   showLoading();
   const [expRes, cuotasRes, pagosRes] = await Promise.all([
-    supabase.from('expedientes').select('*').eq('id', expId).single(),
-    supabase.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
-    supabase.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
+    sbClient.from('expedientes').select('*').eq('id', expId).single(),
+    sbClient.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
+    sbClient.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
   ]);
   const exp = expRes.data; const cuotas = cuotasRes.data||[]; const pagos = pagosRes.data||[];
   const { jsPDF } = window.jspdf;
@@ -1175,9 +1175,9 @@ async function descargarPDF(expId) {
 async function descargarReporteCliente(expId) {
   showLoading();
   const [expRes, cuotasRes, pagosRes] = await Promise.all([
-    supabase.from('expedientes').select('*').eq('id', expId).single(),
-    supabase.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
-    supabase.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
+    sbClient.from('expedientes').select('*').eq('id', expId).single(),
+    sbClient.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
+    sbClient.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
   ]);
   const exp = expRes.data; const cuotas = cuotasRes.data||[]; const pagos = pagosRes.data||[];
   const { jsPDF } = window.jspdf;
@@ -1285,9 +1285,9 @@ async function descargarReporteCliente(expId) {
 async function descargarExcel(expId) {
   showLoading();
   const [expRes, cuotasRes, pagosRes] = await Promise.all([
-    supabase.from('expedientes').select('*').eq('id', expId).single(),
-    supabase.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
-    supabase.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
+    sbClient.from('expedientes').select('*').eq('id', expId).single(),
+    sbClient.from('cuotas').select('*').eq('expediente_id', expId).order('numero'),
+    sbClient.from('pagos').select('*').eq('expediente_id', expId).order('fecha_pago')
   ]);
   const exp = expRes.data; const cuotas = cuotasRes.data||[]; const pagos = pagosRes.data||[];
   const wb = XLSX.utils.book_new();
