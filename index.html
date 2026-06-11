@@ -874,25 +874,6 @@ async function renderExpediente() {
   const cuotasEnMora = cuotas.filter(c => c.estado === 'mora' || (c.estado === 'pendiente' && c.fecha_vencimiento < new Date().toISOString().split('T')[0]));
   const tieneContador = cuotasEnMora.length > 0;
   const moraTotalActual = cuotasEnMora.reduce((a,c) => a + calcMoraAcumulada(c), 0);
-  const saldoConMoraActual = saldoPendiente;
-
-  content.innerHTML = `
-    <div class="exp-header" style="${tieneContador ? 'grid-template-columns:1fr 1fr 1fr 1fr 1fr' : ''}">
-      <div class="exp-header-item"><div class="label">Expediente</div><div class="value">${exp.numero_exp}</div></div>
-      <div class="exp-header-item"><div class="label">Cliente</div><div class="value">${exp.nombre_cliente}</div><div style="font-size:11px;opacity:0.6">${exp.entidad_acreedora}</div></div>
-      <div class="exp-header-item"><div class="label">Saldo pendiente</div><div class="value big">${fmt(saldoPendiente)}</div><div style="font-size:11px;opacity:0.6">${pagadas}/${cuotas.length} cuotas pagas</div></div>
-      ${tieneContador ? `<div class="exp-header-item" style="background:rgba(153,27,27,0.3);border-radius:8px;padding:8px">
-        <div class="label" style="color:#fca5a5">⚠ Mora punitorias</div>
-        <div class="value" style="color:#fca5a5;font-size:18px" id="mora-counter">${fmt(moraTotalActual)}</div>
-        <div style="font-size:10px;color:#fca5a5;opacity:0.8">${exp.mora_diaria||0.5}%/día · ${cuotasEnMora.length} cuota${cuotasEnMora.length>1?'s':''}</div>
-      </div>
-      <div class="exp-header-item" style="background:rgba(153,27,27,0.2);border-radius:8px;padding:8px">
-        <div class="label" style="color:#fca5a5">Total adeudado c/mora</div>
-        <div class="value big" style="color:#ff6b6b" id="total-mora-counter">${fmt(saldoConMoraActual)}</div>
-        <div style="font-size:10px;color:#fca5a5;opacity:0.8">Actualizado en tiempo real</div>
-      </div>` : ''}
-      <div class="exp-header-item"><div class="label">Registrado por</div><div class="value" style="font-size:12px">${exp.registrado_por||'-'}</div><div style="font-size:11px;opacity:0.6">${fmtDate(exp.created_at?.split('T')[0])}</div></div>
-    </div>`;
 
   // Contador en tiempo real si hay mora
   if (tieneContador) {
@@ -906,8 +887,29 @@ async function renderExpediente() {
     }, 10000);
   } else { window._moraInterval && clearInterval(window._moraInterval); }
 
-    ${moraAlerts}
-    <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px">
+  let headerMoraHtml = '';
+  if (tieneContador) {
+    headerMoraHtml = '<div class="exp-header-item" style="background:rgba(153,27,27,0.3);border-radius:8px;padding:8px">'
+      + '<div class="label" style="color:#fca5a5">Mora punitoria</div>'
+      + '<div class="value" style="color:#fca5a5;font-size:18px" id="mora-counter">' + fmt(moraTotalActual) + '</div>'
+      + '<div style="font-size:10px;color:#fca5a5;opacity:0.8">' + (exp.mora_diaria||0.5) + '%/día</div>'
+      + '</div>'
+      + '<div class="exp-header-item" style="background:rgba(153,27,27,0.2);border-radius:8px;padding:8px">'
+      + '<div class="label" style="color:#fca5a5">Total c/mora</div>'
+      + '<div class="value big" style="color:#ff6b6b" id="total-mora-counter">' + fmt(saldoPendiente) + '</div>'
+      + '<div style="font-size:10px;color:#fca5a5;opacity:0.8">Actualizado cada 10s</div>'
+      + '</div>';
+  }
+
+  content.innerHTML = '<div class="exp-header" style="' + (tieneContador ? 'grid-template-columns:1fr 1fr 1fr 1fr 1fr' : '') + '">'
+    + '<div class="exp-header-item"><div class="label">Expediente</div><div class="value">' + exp.numero_exp + '</div></div>'
+    + '<div class="exp-header-item"><div class="label">Cliente</div><div class="value">' + exp.nombre_cliente + '</div><div style="font-size:11px;opacity:0.6">' + exp.entidad_acreedora + '</div></div>'
+    + '<div class="exp-header-item"><div class="label">Saldo pendiente</div><div class="value big">' + fmt(saldoPendiente) + '</div><div style="font-size:11px;opacity:0.6">' + pagadas + '/' + cuotas.length + ' cuotas pagas</div></div>'
+    + headerMoraHtml
+    + '<div class="exp-header-item"><div class="label">Registrado por</div><div class="value" style="font-size:12px">' + (exp.registrado_por||'-') + '</div><div style="font-size:11px;opacity:0.6">' + fmtDate((exp.created_at||'').split('T')[0]) + '</div></div>'
+    + '</div>';
+
+  content.innerHTML += moraAlerts + `<div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px">
       <div class="card">
         <div class="card-header">
           <div class="card-title">Plan de pagos — ${exp.plan_descripcion}</div>
